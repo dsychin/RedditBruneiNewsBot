@@ -1,8 +1,9 @@
 name: Docker
 
 on:
-  create:
-    branches:
+  release:
+    types: published
+    branches: 
       - main
     tags:
       - v*
