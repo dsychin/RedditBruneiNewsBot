@@ -21,7 +21,7 @@ namespace RedditBruneiNewsBot
             var redditConfig = configuration.GetSection("Reddit").Get<RedditConfig>();
 
             var redditClient = new RedditClient(
-                redditConfig.AppId, redditConfig.Secret, redditConfig.RefreshToken);
+                redditConfig.AppId, redditConfig.RefreshToken, redditConfig.Secret);
 
             Console.WriteLine($"Logged in as: {redditClient.Account.Me.Name}");
         }
