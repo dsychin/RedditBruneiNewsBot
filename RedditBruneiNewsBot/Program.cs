@@ -1,10 +1,13 @@
-﻿using System;
+﻿using HtmlAgilityPack;
 using Microsoft.Extensions.Configuration;
-using RedditBruneiNewsBot.Models;
 using Reddit;
-using System.Collections.Generic;
 using Reddit.Controllers;
 using Reddit.Controllers.EventArgs;
+using RedditBruneiNewsBot.Models;
+using System;
+using System.Collections.Generic;
+using HtmlAgilityPack.CssSelectors.NetCore;
+using System.Text;
 
 namespace RedditBruneiNewsBot
 {
@@ -52,10 +55,37 @@ namespace RedditBruneiNewsBot
                 Console.WriteLine("New Post by " + post.Author + ": " + post.Title);
                 if (!post.Listing.IsSelf)
                 {
-                    Console.WriteLine("Link post: " + ((LinkPost) post).URL);
+                    var linkPost = (LinkPost) post;
+                    var uri = new Uri(linkPost.URL);
 
-                    // post reply
-                    post.Reply("Bot reply!\r\nI see a new link post: " + ((LinkPost) post).URL);
+                    switch (uri.Authority)
+                    {
+                        case "borneobulletin.com.bn":
+                        case "www.borneobulletin.com.bn":
+                            var web = new HtmlWeb();
+                            var doc = web.Load(uri.ToString());
+
+                            var contentNode = doc.QuerySelector(".td-post-content");
+
+                            // remove images and captions
+                            var figures = contentNode.QuerySelectorAll("figure");
+                            foreach (var figure in figures)
+                            {
+                                figure.Remove();
+                            }
+
+                            // build output text
+                            var builder = new StringBuilder();
+                            foreach (var line in contentNode.QuerySelectorAll("p"))
+                            {
+                                builder.Append(line.InnerText + "\n\n");
+                            }
+
+                            // post reply
+                            post.Reply(builder.ToString());
+                            break;
+                    }
+
                 }
             }
         }
