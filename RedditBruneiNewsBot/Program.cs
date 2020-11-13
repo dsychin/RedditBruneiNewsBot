@@ -31,21 +31,26 @@ namespace RedditBruneiNewsBot
 
             Console.WriteLine($"Logged in as: {reddit.Account.Me.Name}");
 
-            var subreddit = reddit.Subreddit("testingground4bots");
+            var subredditsToMonitor = configuration["Subreddits"].Split(",");
 
-            var posts = new List<Post>();
+            foreach (var subredditName in subredditsToMonitor)
+            {
+                var subreddit = reddit.Subreddit(subredditName);
 
-            // start monitoring
-            posts = subreddit.Posts.GetNew();
-            subreddit.Posts.NewUpdated += NewPostUpdated;
-            subreddit.Posts.MonitorNew();
+                var posts = new List<Post>();
+
+                // start monitoring
+                posts = subreddit.Posts.GetNew();
+                subreddit.Posts.NewUpdated += NewPostUpdated;
+                subreddit.Posts.MonitorNew();
+            }
 
             Console.WriteLine("Program running. Press enter to stop.");
             Console.ReadLine();
 
             // stop monitoring
-            subreddit.Posts.MonitorNew();
-            subreddit.Posts.NewUpdated -= NewPostUpdated;
+            // subreddit.Posts.MonitorNew();
+            // subreddit.Posts.NewUpdated -= NewPostUpdated;
         }
 
         private static void NewPostUpdated(object sender, PostsUpdateEventArgs e)
