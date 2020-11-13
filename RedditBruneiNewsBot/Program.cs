@@ -53,6 +53,9 @@ namespace RedditBruneiNewsBot
                 if (!post.Listing.IsSelf)
                 {
                     Console.WriteLine("Link post: " + ((LinkPost) post).URL);
+
+                    // post reply
+                    post.Reply("Bot reply!\r\nI see a new link post: " + ((LinkPost) post).URL);
                 }
             }
         }
