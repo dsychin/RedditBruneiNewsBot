@@ -14,6 +14,7 @@ namespace RedditBruneiNewsBot
     class Program
     {
         private static readonly string _version = "v0.1.1";
+        private static List<Subreddit> _subreddits { get; set; } = new List<Subreddit>();
 
         static void Main(string[] args)
         {
@@ -38,6 +39,7 @@ namespace RedditBruneiNewsBot
             foreach (var subredditName in subredditsToMonitor)
             {
                 var subreddit = reddit.Subreddit(subredditName);
+                _subreddits.Add(subreddit);
 
                 var posts = new List<Post>();
 
@@ -51,8 +53,11 @@ namespace RedditBruneiNewsBot
             Console.ReadLine();
 
             // stop monitoring
-            // subreddit.Posts.MonitorNew();
-            // subreddit.Posts.NewUpdated -= NewPostUpdated;
+            foreach (var subreddit in _subreddits)
+            {
+                subreddit.Posts.MonitorNew();
+                subreddit.Posts.NewUpdated -= NewPostUpdated;
+            }
         }
 
         private static void NewPostUpdated(object sender, PostsUpdateEventArgs e)
