@@ -18,6 +18,8 @@ namespace RedditBruneiNewsBot
 
         static void Main(string[] args)
         {
+            Console.WriteLine($"Reddit Brunei News Bot {_version}");
+
             var environmentName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
 
             var builder = new ConfigurationBuilder()
@@ -35,6 +37,8 @@ namespace RedditBruneiNewsBot
             Console.WriteLine($"Logged in as: {reddit.Account.Me.Name}");
 
             var subredditsToMonitor = configuration["Subreddits"].Split(",");
+
+            Console.WriteLine($"Monitoring the following subreddits: {string.Join(", ", subredditsToMonitor)}");
 
             foreach (var subredditName in subredditsToMonitor)
             {
