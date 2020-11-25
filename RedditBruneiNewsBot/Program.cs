@@ -95,7 +95,11 @@ namespace RedditBruneiNewsBot
 
                             // add title
                             var title = doc.QuerySelector(".td-post-title h1").InnerText;
-                            builder.Append("# " + title + "\n\n");
+                            builder.Append($"# {title}\n\n");
+
+                            // add date
+                            var date = doc.QuerySelector(".td-post-title time").InnerText;
+                            builder.Append($"^({date})");
 
                             // add content
                             foreach (var line in contentNode.ChildNodes)
