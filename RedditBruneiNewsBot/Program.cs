@@ -81,7 +81,7 @@ namespace RedditBruneiNewsBot
 
                             // build output text
                             var builder = new StringBuilder();
-                            foreach (var line in contentNode.QuerySelectorAll("p"))
+                            foreach (var line in contentNode.ChildNodes)
                             {
                                 builder.Append(line.InnerText + "\n\n");
                             }
