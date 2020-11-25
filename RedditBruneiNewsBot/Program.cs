@@ -57,11 +57,11 @@ namespace RedditBruneiNewsBot
             Console.ReadLine();
 
             // stop monitoring
-            foreach (var subreddit in _subreddits)
-            {
-                subreddit.Posts.MonitorNew();
-                subreddit.Posts.NewUpdated -= NewPostUpdated;
-            }
+            // foreach (var subreddit in _subreddits)
+            // {
+            //     subreddit.Posts.MonitorNew();
+            //     subreddit.Posts.NewUpdated -= NewPostUpdated;
+            // }
         }
 
         private static void NewPostUpdated(object sender, PostsUpdateEventArgs e)
