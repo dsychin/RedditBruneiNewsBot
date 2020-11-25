@@ -81,6 +81,12 @@ namespace RedditBruneiNewsBot
 
                             // build output text
                             var builder = new StringBuilder();
+
+                            // add title
+                            var title = doc.QuerySelector(".td-post-title h1").InnerText;
+                            builder.Append("# " + title + "\n\n");
+
+                            // add content
                             foreach (var line in contentNode.ChildNodes)
                             {
                                 builder.Append(line.InnerText + "\n\n");
