@@ -13,6 +13,8 @@ namespace RedditBruneiNewsBot
 {
     class Program
     {
+        private static readonly string _version = "v0.1.1";
+
         static void Main(string[] args)
         {
             var environmentName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
@@ -91,6 +93,10 @@ namespace RedditBruneiNewsBot
                             {
                                 builder.Append(line.InnerText + "\n\n");
                             }
+
+                            // add footer
+                            builder.AppendLine("***");
+                            builder.Append($"^([ )[^(Give feedback)](https://www.reddit.com/message/compose?to=brunei_news_bot)^( | )[^(Code)](https://github.com/dsychin/RedditBruneiNewsBot)^( ] {_version})");
 
                             // post reply
                             post.Reply(builder.ToString());
