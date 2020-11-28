@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using HtmlAgilityPack.CssSelectors.NetCore;
 using System.Text;
+using System.Net.Http;
 
 namespace RedditBruneiNewsBot
 {
@@ -15,6 +16,7 @@ namespace RedditBruneiNewsBot
     {
         private static readonly string _version = "v0.1.1";
         private static List<Subreddit> _subreddits { get; set; } = new List<Subreddit>();
+        private static readonly HttpClient _httpClient = new HttpClient();
 
         static void Main(string[] args)
         {
@@ -76,6 +78,10 @@ namespace RedditBruneiNewsBot
                             case "www.borneobulletin.com.bn":
                                 builder = GetBorneoBulletinArticle(uri);
                                 break;
+                            case "thescoop.co":
+                            case "www.thescoop.co":
+                                builder = GetTheScoopArticle(uri);
+                                break;
                             default:
                                 isSupported = false;
                                 break;
@@ -128,7 +134,46 @@ namespace RedditBruneiNewsBot
 
             // add date
             var date = doc.QuerySelector(".td-post-title time").InnerText;
-            builder.Append($"^({date})");
+            builder.Append($"^({date})\n\n");
+
+            // add content
+            foreach (var line in contentNode.ChildNodes)
+            {
+                builder.Append(line.InnerText + "\n\n");
+            }
+
+            return builder;
+        }
+
+        private static StringBuilder GetTheScoopArticle(Uri uri)
+        {
+            var stringTask = _httpClient.GetStringAsync(uri.ToString());
+            var doc = new HtmlDocument();
+            doc.LoadHtml(stringTask.Result);
+
+            var contentNode = doc.QuerySelector(".post-content");
+
+            // remove images and captions
+            var figures = contentNode.QuerySelectorAll("figure,div");
+            foreach (var figure in figures)
+            {
+                figure.Remove();
+            }
+
+            // build output text
+            var builder = new StringBuilder();
+
+            // add title
+            var title = doc.QuerySelector(".post-title h1 .entry-title-primary").InnerText;
+            builder.Append($"# {title}\n\n");
+
+            // add date
+            var date = doc.QuerySelector(".post-date").InnerText;
+            builder.Append($"^({date.Trim()})\n\n");
+
+            // add author
+            var author = doc.QuerySelector(".scoop-byline").InnerText;
+            builder.Append($"{author}\n\n");
 
             // add content
             foreach (var line in contentNode.ChildNodes)
