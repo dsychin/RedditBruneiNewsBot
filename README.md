@@ -6,8 +6,6 @@
 ![GitHub last commit](https://img.shields.io/github/last-commit/dsychin/RedditBruneiNewsBot)
 ![.NET Core Build](https://github.com/dsychin/RedditBruneiNewsBot/workflows/.NET%20Core%20Build/badge.svg)
 
-
-
 ## Description
 
 This repository includes the code for the `brunei_news_bot` reddit account which monitors a list of subreddit for new post with links to news articles and automatically scrape the website for the content and post it as a reply.
@@ -23,7 +21,7 @@ This repository includes the code for the `brunei_news_bot` reddit account which
 
 ### Prerequisites
 
-1. [.NET Core 5.0 SDK](https://dotnet.microsoft.com/download)
+1. [.NET 5.0 SDK](https://dotnet.microsoft.com/download)
 2. Windows/Linux/Mac
 
 ### Developing locally
