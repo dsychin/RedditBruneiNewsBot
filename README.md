@@ -1,6 +1,12 @@
 # Reddit Brunei News Bot
 
-![Docker](https://github.com/dsychin/RedditBruneiNewsBot/workflows/Docker/badge.svg)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/dsychin/RedditBruneiNewsBot)
+![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/dsychin/RedditBruneiNewsBot)
+![GitHub issues](https://img.shields.io/github/issues-raw/dsychin/RedditBruneiNewsBot)
+![GitHub last commit](https://img.shields.io/github/last-commit/dsychin/RedditBruneiNewsBot)
+![.NET Core Build](https://github.com/dsychin/RedditBruneiNewsBot/workflows/.NET%20Core%20Build/badge.svg)
+
+
 
 ## Description
 
