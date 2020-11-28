@@ -53,15 +53,7 @@ namespace RedditBruneiNewsBot
                 subreddit.Posts.MonitorNew();
             }
 
-            Console.WriteLine("Program running. Press enter to stop.");
-            Console.ReadLine();
-
-            // stop monitoring
-            // foreach (var subreddit in _subreddits)
-            // {
-            //     subreddit.Posts.MonitorNew();
-            //     subreddit.Posts.NewUpdated -= NewPostUpdated;
-            // }
+            Console.WriteLine("Program running. Press Ctrl+C to stop.");
         }
 
         private static void NewPostUpdated(object sender, PostsUpdateEventArgs e)
@@ -73,6 +65,8 @@ namespace RedditBruneiNewsBot
                 {
                     var linkPost = (LinkPost) post;
                     var uri = new Uri(linkPost.URL);
+                    var builder = new StringBuilder();
+                    var isSupported = true;
 
                     try
                     {
@@ -80,24 +74,31 @@ namespace RedditBruneiNewsBot
                         {
                             case "borneobulletin.com.bn":
                             case "www.borneobulletin.com.bn":
-                                StringBuilder builder = GetBorneoBulletinArticle(uri);
-
-                                // add footer
-                                builder.AppendLine("***");
-                                builder.Append($"^([ )[^(Give feedback)](https://www.reddit.com/message/compose?to=brunei_news_bot)^( | )[^(Code)](https://github.com/dsychin/RedditBruneiNewsBot)^( ] {_version})");
-                                
-                                // post reply
-                                linkPost.Reply(builder.ToString());
+                                builder = GetBorneoBulletinArticle(uri);
+                                break;
+                            default:
+                                isSupported = false;
                                 break;
                         }
-                        
+
+                        // post reply
+                        if (isSupported)
+                        {
+                            // add footer
+                            builder.AppendLine("***");
+                            builder.Append($"^([ )[^(Give feedback)](https://www.reddit.com/message/compose?to=brunei_news_bot)^( | )[^(Code)](https://github.com/dsychin/RedditBruneiNewsBot)^( ] {_version})");
+                            
+                            var reply = linkPost.Reply(builder.ToString());
+                            Console.WriteLine($"Replied: {reply.Permalink}");
+                        }
                     }
-                    catch (Exception)
+                    catch (Exception ex)
                     {
                         Console.WriteLine("An error occured for the following post.");
                         Console.WriteLine($"    Post: {linkPost.Permalink}");
                         Console.WriteLine($"    Title: {linkPost.Title}");
                         Console.WriteLine($"    URL: {linkPost.URL}");
+                        Console.WriteLine(ex.ToString());
                     }
 
                 }
