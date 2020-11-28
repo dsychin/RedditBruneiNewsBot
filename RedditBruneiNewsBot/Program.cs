@@ -74,50 +74,68 @@ namespace RedditBruneiNewsBot
                     var linkPost = (LinkPost) post;
                     var uri = new Uri(linkPost.URL);
 
-                    switch (uri.Authority)
+                    try
                     {
-                        case "borneobulletin.com.bn":
-                        case "www.borneobulletin.com.bn":
-                            var web = new HtmlWeb();
-                            var doc = web.Load(uri.ToString());
+                        switch (uri.Authority)
+                        {
+                            case "borneobulletin.com.bn":
+                            case "www.borneobulletin.com.bn":
+                                StringBuilder builder = GetBorneoBulletinArticle(uri);
 
-                            var contentNode = doc.QuerySelector(".td-post-content");
-
-                            // remove images and captions
-                            var figures = contentNode.QuerySelectorAll("figure");
-                            foreach (var figure in figures)
-                            {
-                                figure.Remove();
-                            }
-
-                            // build output text
-                            var builder = new StringBuilder();
-
-                            // add title
-                            var title = doc.QuerySelector(".td-post-title h1").InnerText;
-                            builder.Append($"# {title}\n\n");
-
-                            // add date
-                            var date = doc.QuerySelector(".td-post-title time").InnerText;
-                            builder.Append($"^({date})");
-
-                            // add content
-                            foreach (var line in contentNode.ChildNodes)
-                            {
-                                builder.Append(line.InnerText + "\n\n");
-                            }
-
-                            // add footer
-                            builder.AppendLine("***");
-                            builder.Append($"^([ )[^(Give feedback)](https://www.reddit.com/message/compose?to=brunei_news_bot)^( | )[^(Code)](https://github.com/dsychin/RedditBruneiNewsBot)^( ] {_version})");
-
-                            // post reply
-                            post.Reply(builder.ToString());
-                            break;
+                                // add footer
+                                builder.AppendLine("***");
+                                builder.Append($"^([ )[^(Give feedback)](https://www.reddit.com/message/compose?to=brunei_news_bot)^( | )[^(Code)](https://github.com/dsychin/RedditBruneiNewsBot)^( ] {_version})");
+                                
+                                // post reply
+                                linkPost.Reply(builder.ToString());
+                                break;
+                        }
+                        
+                    }
+                    catch (Exception)
+                    {
+                        Console.WriteLine("An error occured for the following post.");
+                        Console.WriteLine($"    Post: {linkPost.Permalink}");
+                        Console.WriteLine($"    Title: {linkPost.Title}");
+                        Console.WriteLine($"    URL: {linkPost.URL}");
                     }
 
                 }
             }
+        }
+
+        private static StringBuilder GetBorneoBulletinArticle(Uri uri)
+        {
+            var web = new HtmlWeb();
+            var doc = web.Load(uri.ToString());
+
+            var contentNode = doc.QuerySelector(".td-post-content");
+
+            // remove images and captions
+            var figures = contentNode.QuerySelectorAll("figure");
+            foreach (var figure in figures)
+            {
+                figure.Remove();
+            }
+
+            // build output text
+            var builder = new StringBuilder();
+
+            // add title
+            var title = doc.QuerySelector(".td-post-title h1").InnerText;
+            builder.Append($"# {title}\n\n");
+
+            // add date
+            var date = doc.QuerySelector(".td-post-title time").InnerText;
+            builder.Append($"^({date})");
+
+            // add content
+            foreach (var line in contentNode.ChildNodes)
+            {
+                builder.Append(line.InnerText + "\n\n");
+            }
+
+            return builder;
         }
     }
 }
