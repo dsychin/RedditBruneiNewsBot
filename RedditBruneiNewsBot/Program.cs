@@ -14,7 +14,7 @@ namespace RedditBruneiNewsBot
 {
     class Program
     {
-        private static readonly string _version = "v0.1.1";
+        private static readonly string _version = "v0.2.0";
         private static List<Subreddit> _subreddits { get; set; } = new List<Subreddit>();
         private static readonly HttpClient _httpClient = new HttpClient();
 
