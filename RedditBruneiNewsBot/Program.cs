@@ -9,14 +9,17 @@ using System.Collections.Generic;
 using HtmlAgilityPack.CssSelectors.NetCore;
 using System.Text;
 using System.Net.Http;
+using System.Threading.Tasks;
 
 namespace RedditBruneiNewsBot
 {
     class Program
     {
-        private static readonly string _version = "v0.2.0";
+        private static readonly string _version = "v0.2.1";
         private static List<Subreddit> _subreddits { get; set; } = new List<Subreddit>();
         private static readonly HttpClient _httpClient = new HttpClient();
+        private static readonly int _maxRetries = 5;
+        private static readonly int _retryInterval = 60000;
 
         static void Main(string[] args)
         {
@@ -58,63 +61,81 @@ namespace RedditBruneiNewsBot
             Console.WriteLine("Program running. Press Ctrl+C to stop.");
         }
 
-        private static void NewPostUpdated(object sender, PostsUpdateEventArgs e)
+        private static async void NewPostUpdated(object sender, PostsUpdateEventArgs e)
         {
             foreach (Post post in e.Added)
             {
                 Console.WriteLine("New Post by " + post.Author + ": " + post.Title);
                 if (!post.Listing.IsSelf)
                 {
-                    var linkPost = (LinkPost) post;
-                    var uri = new Uri(linkPost.URL);
-                    var builder = new StringBuilder();
-                    var isSupported = true;
+                    var linkPost = (LinkPost)post;
 
-                    try
+                    var success = false;
+                    var retries = 0;
+
+                    while (!success && retries <= _maxRetries)
                     {
-                        switch (uri.Authority)
+                        try
                         {
-                            case "borneobulletin.com.bn":
-                            case "www.borneobulletin.com.bn":
-                                builder = GetBorneoBulletinArticle(uri);
-                                break;
-                            case "thescoop.co":
-                            case "www.thescoop.co":
-                                builder = GetTheScoopArticle(uri);
-                                break;
-                            default:
-                                isSupported = false;
-                                break;
-                        }
+                            var uri = new Uri(linkPost.URL);
+                            var builder = new StringBuilder();
+                            var isSupported = true;
 
-                        // post reply
-                        if (isSupported)
+                            switch (uri.Authority)
+                            {
+                                case "borneobulletin.com.bn":
+                                case "www.borneobulletin.com.bn":
+                                    Console.WriteLine("Found Borneo Bulletin");
+                                    builder = await GetBorneoBulletinArticle(uri);
+                                    break;
+                                case "thescoop.co":
+                                case "www.thescoop.co":
+                                    Console.WriteLine("Found The Scoop");
+                                    builder = await GetTheScoopArticle(uri);
+                                    break;
+                                default:
+                                    isSupported = false;
+                                    break;
+                            }
+
+                            // post reply
+                            if (isSupported)
+                            {
+                                // add footer
+                                builder.AppendLine("***");
+                                builder.Append($"^([ )[^(Give feedback)](https://www.reddit.com/message/compose?to=brunei_news_bot)^( | )[^(Code)](https://github.com/dsychin/RedditBruneiNewsBot)^( ] {_version})");
+
+                                var reply = linkPost.Reply(builder.ToString());
+                                Console.WriteLine($"Replied: {reply.Permalink}");
+                            }
+                            success = true;
+                        }
+                        catch (Exception ex)
                         {
-                            // add footer
-                            builder.AppendLine("***");
-                            builder.Append($"^([ )[^(Give feedback)](https://www.reddit.com/message/compose?to=brunei_news_bot)^( | )[^(Code)](https://github.com/dsychin/RedditBruneiNewsBot)^( ] {_version})");
-                            
-                            var reply = linkPost.Reply(builder.ToString());
-                            Console.WriteLine($"Replied: {reply.Permalink}");
+                            retries++;
+                            Console.WriteLine("An error occured for the following post.");
+                            Console.WriteLine($"    Post: {linkPost.Permalink}");
+                            Console.WriteLine($"    Title: {linkPost.Title}");
+                            Console.WriteLine($"    URL: {linkPost.URL}");
+                            Console.WriteLine(ex.ToString());
+
+                            if (retries <= _maxRetries)
+                            {
+                                Console.WriteLine($"Retrying in {_retryInterval / 1000} seconds.");
+                                await Task.Delay(_retryInterval);
+                            }
                         }
                     }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine("An error occured for the following post.");
-                        Console.WriteLine($"    Post: {linkPost.Permalink}");
-                        Console.WriteLine($"    Title: {linkPost.Title}");
-                        Console.WriteLine($"    URL: {linkPost.URL}");
-                        Console.WriteLine(ex.ToString());
-                    }
-
                 }
             }
         }
 
-        private static StringBuilder GetBorneoBulletinArticle(Uri uri)
+        private static async Task<StringBuilder> GetBorneoBulletinArticle(Uri uri)
         {
-            var web = new HtmlWeb();
-            var doc = web.Load(uri.ToString());
+            var response = await _httpClient.GetAsync(uri.ToString());
+            response.EnsureSuccessStatusCode();
+            var doc = new HtmlDocument();
+            doc.LoadHtml(await response.Content.ReadAsStringAsync());
 
             var contentNode = doc.QuerySelector(".td-post-content");
 
@@ -145,11 +166,12 @@ namespace RedditBruneiNewsBot
             return builder;
         }
 
-        private static StringBuilder GetTheScoopArticle(Uri uri)
+        private static async Task<StringBuilder> GetTheScoopArticle(Uri uri)
         {
-            var stringTask = _httpClient.GetStringAsync(uri.ToString());
+            var response = await _httpClient.GetAsync(uri.ToString());
+            response.EnsureSuccessStatusCode();
             var doc = new HtmlDocument();
-            doc.LoadHtml(stringTask.Result);
+            doc.LoadHtml(await response.Content.ReadAsStringAsync());
 
             var contentNode = doc.QuerySelector(".post-content");
 
