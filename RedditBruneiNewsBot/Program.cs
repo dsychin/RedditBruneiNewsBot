@@ -15,9 +15,8 @@ namespace RedditBruneiNewsBot
 {
     class Program
     {
-        private static readonly string _version = "v0.2.1";
+        private static readonly string _version = "v0.2.2";
         private static List<Subreddit> _subreddits { get; set; } = new List<Subreddit>();
-        private static readonly HttpClient _httpClient = new HttpClient();
         private static readonly int _maxRetries = 5;
         private static readonly int _retryInterval = 60000;
 
@@ -132,7 +131,8 @@ namespace RedditBruneiNewsBot
 
         private static async Task<StringBuilder> GetBorneoBulletinArticle(Uri uri)
         {
-            var response = await _httpClient.GetAsync(uri.ToString());
+            using var httpClient = new HttpClient();
+            var response = await httpClient.GetAsync(uri.ToString());
             response.EnsureSuccessStatusCode();
             var doc = new HtmlDocument();
             doc.LoadHtml(await response.Content.ReadAsStringAsync());
@@ -168,7 +168,8 @@ namespace RedditBruneiNewsBot
 
         private static async Task<StringBuilder> GetTheScoopArticle(Uri uri)
         {
-            var response = await _httpClient.GetAsync(uri.ToString());
+            using var httpClient = new HttpClient();
+            var response = await httpClient.GetAsync(uri.ToString());
             response.EnsureSuccessStatusCode();
             var doc = new HtmlDocument();
             doc.LoadHtml(await response.Content.ReadAsStringAsync());
