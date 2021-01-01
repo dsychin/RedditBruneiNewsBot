@@ -37,7 +37,10 @@ namespace RedditBruneiNewsBot.Services
                 RequestUri = new Uri(_apiUrl + "album"),
                 Method = HttpMethod.Post,
                 Headers = {
-                    { HttpRequestHeader.Authorization.ToString(), _clientId }
+                    {
+                        HttpRequestHeader.Authorization.ToString(),
+                        "Client-ID " + _clientId
+                    }
                 }
             };
 
@@ -46,7 +49,12 @@ namespace RedditBruneiNewsBot.Services
             var jsonString = await response.Content.ReadAsStringAsync();
 
             var responseObject = JsonSerializer
-                .Deserialize<BasicResponse<AlbumCreationData>>(jsonString);
+                .Deserialize<BasicResponse<AlbumCreationData>>(
+                    jsonString,
+                    new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
 
             return responseObject.Data.Id;
         }
