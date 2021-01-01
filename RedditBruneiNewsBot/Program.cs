@@ -169,15 +169,18 @@ namespace RedditBruneiNewsBot
             }
 
             // Add images to Imgur
-            var albumLink = "";
-            try
+            if (images.Any())
             {
-                albumLink = await _imgurService.CreateAlbumFromImagesAsync(images);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error creating image album!\n{uri.ToString()}");
-                Console.WriteLine(ex.ToString());
+                var albumLink = "";
+                try
+                {
+                    albumLink = await _imgurService.CreateAlbumFromImagesAsync(images);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error creating image album!\n{uri.ToString()}");
+                    Console.WriteLine(ex.ToString());
+                }
             }
 
             // build output text
