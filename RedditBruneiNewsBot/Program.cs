@@ -145,7 +145,7 @@ namespace RedditBruneiNewsBot
             var contentNode = doc.QuerySelector(".td-post-content");
 
             // remove images and captions from doc
-            var images = new List<Images>();
+            var images = new List<Image>();
             var figures = contentNode.QuerySelectorAll("figure");
             foreach (var figure in figures)
             {
@@ -160,7 +160,7 @@ namespace RedditBruneiNewsBot
 
                 var caption = figure.QuerySelector("figcaption").InnerText.Trim();
 
-                images.Add(new Images()
+                images.Add(new Image()
                 {
                     Url = imgUrl,
                     Caption = caption
@@ -169,9 +169,9 @@ namespace RedditBruneiNewsBot
             }
 
             // Add images to Imgur
+            var albumLink = "";
             if (images.Any())
             {
-                var albumLink = "";
                 try
                 {
                     albumLink = await _imgurService.CreateAlbumFromImagesAsync(images);
