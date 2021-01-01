@@ -34,7 +34,10 @@ This repository includes the code for the `brunei_news_bot` reddit account which
         "AppId": "",
         "RefreshToken": ""
     },
-    "Subreddits": "test"
+    "Imgur": {
+        "ClientId": ""
+    },
+    "Subreddits": "testingground4bots"
 }
 ```
 
@@ -57,6 +60,7 @@ Please refer to the [Microsoft Docs](https://docs.microsoft.com/en-us/dotnet/cor
 Reddit__Secret=123
 Reddit__AppId=123
 Reddit__RefreshToken=123
+Imgur__ClientId=123
 Subreddits=123,456
 ```
 4. Run `dotnet RedditBruneiNewsBot.dll`.
