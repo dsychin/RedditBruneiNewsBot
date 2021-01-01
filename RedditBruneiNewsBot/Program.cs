@@ -10,15 +10,19 @@ using HtmlAgilityPack.CssSelectors.NetCore;
 using System.Text;
 using System.Net.Http;
 using System.Threading.Tasks;
+using System.Linq;
+using RedditBruneiNewsBot.Services;
+using System.Text.RegularExpressions;
 
 namespace RedditBruneiNewsBot
 {
     class Program
     {
-        private static readonly string _version = "v0.2.2";
-        private static List<Subreddit> _subreddits { get; set; } = new List<Subreddit>();
+        private static readonly string _version = "v0.3.0";
         private static readonly int _maxRetries = 5;
         private static readonly int _retryInterval = 60000;
+        private static List<Subreddit> _subreddits { get; set; } = new List<Subreddit>();
+        private static ImgurService _imgurService;
 
         static void Main(string[] args)
         {
@@ -37,6 +41,7 @@ namespace RedditBruneiNewsBot
 
             var reddit = new RedditClient(
                 redditConfig.AppId, redditConfig.RefreshToken, redditConfig.Secret);
+            _imgurService = new ImgurService(configuration["Imgur:ClientId"]);
 
             Console.WriteLine($"Logged in as: {reddit.Account.Me.Name}");
 
@@ -139,11 +144,43 @@ namespace RedditBruneiNewsBot
 
             var contentNode = doc.QuerySelector(".td-post-content");
 
-            // remove images and captions
+            // remove images and captions from doc
+            var images = new List<Image>();
             var figures = contentNode.QuerySelectorAll("figure");
             foreach (var figure in figures)
             {
+                // get images in article
+                var img = figure.QuerySelector("img");
+                var imgSrcSet = img.GetAttributeValue("srcset", "");
+
+                // get url from srcset
+                var pattern = @"(https://\S+)";
+                var match = Regex.Match(imgSrcSet, pattern, RegexOptions.RightToLeft);
+                var imgUrl = match.Value;
+
+                var caption = figure.QuerySelector("figcaption").InnerText.Trim();
+
+                images.Add(new Image()
+                {
+                    Url = imgUrl,
+                    Caption = caption
+                });
                 figure.Remove();
+            }
+
+            // Add images to Imgur
+            var albumLink = "";
+            if (images.Any())
+            {
+                try
+                {
+                    albumLink = await _imgurService.CreateAlbumFromImagesAsync(images);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error creating image album!\n{uri.ToString()}");
+                    Console.WriteLine(ex.ToString());
+                }
             }
 
             // build output text
@@ -156,6 +193,12 @@ namespace RedditBruneiNewsBot
             // add date
             var date = doc.QuerySelector(".td-post-title time").InnerText;
             builder.Append($"^({date})\n\n");
+
+            // add link to image album
+            if (!string.IsNullOrWhiteSpace(albumLink))
+            {
+                builder.Append($"[View Images]({albumLink})\n\n");
+            }
 
             // add content
             foreach (var line in contentNode.ChildNodes)
