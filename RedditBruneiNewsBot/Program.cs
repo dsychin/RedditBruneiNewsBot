@@ -12,6 +12,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using System.Linq;
 using RedditBruneiNewsBot.Services;
+using System.Text.RegularExpressions;
 
 namespace RedditBruneiNewsBot
 {
@@ -149,11 +150,20 @@ namespace RedditBruneiNewsBot
             foreach (var figure in figures)
             {
                 // get images in article
+                var img = figure.QuerySelector("img");
+                var imgSrcSet = img.GetAttributeValue("srcset", "");
+
+                // get url from srcset
+                var pattern = @"(https://\S+)";
+                var match = Regex.Match(imgSrcSet, pattern, RegexOptions.RightToLeft);
+                var imgUrl = match.Value;
+
+                var caption = figure.QuerySelector("figcaption").InnerText.Trim();
+
                 images.Add(new Images()
                 {
-                    Url = figure.QuerySelector("img").Attributes
-                        .Where(i => i.Name == "src").FirstOrDefault().Value,
-                    Caption = figure.QuerySelector("figcaption").InnerText.Trim()
+                    Url = imgUrl,
+                    Caption = caption
                 });
                 figure.Remove();
             }

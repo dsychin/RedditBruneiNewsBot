@@ -27,7 +27,7 @@ namespace RedditBruneiNewsBot.Services
         {
             var albumId = await CreateAlbumAsync();
             Console.WriteLine(albumId);
-            return "";
+            return "https://imgur.com/a/" + albumId;
         }
 
         private async Task<string> CreateAlbumAsync()
