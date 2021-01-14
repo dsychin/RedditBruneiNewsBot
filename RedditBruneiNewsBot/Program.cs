@@ -1,18 +1,19 @@
 ﻿using HtmlAgilityPack;
+using HtmlAgilityPack.CssSelectors.NetCore;
 using Microsoft.Extensions.Configuration;
+using MihaZupan;
 using Reddit;
 using Reddit.Controllers;
 using Reddit.Controllers.EventArgs;
 using RedditBruneiNewsBot.Models;
+using RedditBruneiNewsBot.Services;
 using System;
 using System.Collections.Generic;
-using HtmlAgilityPack.CssSelectors.NetCore;
-using System.Text;
-using System.Net.Http;
-using System.Threading.Tasks;
 using System.Linq;
-using RedditBruneiNewsBot.Services;
+using System.Net.Http;
+using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace RedditBruneiNewsBot
 {
@@ -23,6 +24,10 @@ namespace RedditBruneiNewsBot
         private static readonly int _retryInterval = 60000;
         private static List<Subreddit> _subreddits { get; set; } = new List<Subreddit>();
         private static ImgurService _imgurService;
+        private static string[] _proxies;
+        private static int _proxyPort;
+        private static string _proxyUsername;
+        private static string _proxyPassword;
 
         static void Main(string[] args)
         {
@@ -37,11 +42,20 @@ namespace RedditBruneiNewsBot
                 .AddCommandLine(args);
             var configuration = builder.Build();
 
+            // get reddit config
             var redditConfig = configuration.GetSection("Reddit").Get<RedditConfig>();
 
             var reddit = new RedditClient(
                 redditConfig.AppId, redditConfig.RefreshToken, redditConfig.Secret);
+
+            // get imgur config
             _imgurService = new ImgurService(configuration["Imgur:ClientId"]);
+
+            // get proxy config
+            _proxies = configuration["Proxy:Hosts"].Split(";");
+            _proxyPort = Int32.Parse(configuration["Proxy:Port"]);
+            _proxyUsername = configuration["Proxy:Username"];
+            _proxyPassword = configuration["Proxy:Password"];
 
             Console.WriteLine($"Logged in as: {reddit.Account.Me.Name}");
 
@@ -136,7 +150,12 @@ namespace RedditBruneiNewsBot
 
         private static async Task<StringBuilder> GetBorneoBulletinArticle(Uri uri)
         {
-            using var httpClient = new HttpClient();
+            // set up proxy
+            var proxy = new HttpToSocks5Proxy(_proxies[0], _proxyPort, _proxyUsername, _proxyPassword);
+            var handler = new HttpClientHandler { Proxy = proxy };
+
+            using var httpClient = new HttpClient(handler, true);
+
             var response = await httpClient.GetAsync(uri.ToString());
             response.EnsureSuccessStatusCode();
             var doc = new HtmlDocument();
