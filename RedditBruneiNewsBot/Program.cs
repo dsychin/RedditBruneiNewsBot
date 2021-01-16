@@ -130,7 +130,10 @@ namespace RedditBruneiNewsBot
                             {
                                 // add footer
                                 builder.AppendLine("***");
-                                builder.Append($"^([ )[^(Give feedback)](https://www.reddit.com/message/compose?to=brunei_news_bot)^( | )[^(Code)](https://github.com/dsychin/RedditBruneiNewsBot)^( ] {_version})");
+                                builder.Append($@"^([ )[^(Give feedback)](https://www.reddit.com/message/compose?to=brunei_news_bot)
+                                ^( | )[^(Code)](https://github.com/dsychin/RedditBruneiNewsBot)
+                                ^( | )[^(Changelog)](https://github.com/dsychin/RedditBruneiNewsBot/releases)
+                                ^( ] {_version})");
 
                                 var reply = linkPost.Reply(builder.ToString());
                                 Console.WriteLine($"Replied: {reply.Permalink}");
