@@ -193,17 +193,23 @@ namespace RedditBruneiNewsBot
                 var imgSrcSet = img.GetAttributeValue("srcset", "");
 
                 // get url from srcset
-                var pattern = @"(https://\S+)";
-                var match = Regex.Match(imgSrcSet, pattern, RegexOptions.RightToLeft);
-                var imgUrl = match.Value;
+                var pattern = @"(https://\S+) (\d+)w";
+                var matches = Regex.Matches(imgSrcSet, pattern);
+                var bestUrl = matches
+                    .OrderByDescending(x => Int32.Parse(x.Groups[2].Value))
+                    .Select(x => x.Groups[1].Value)
+                    .FirstOrDefault();
 
                 var caption = figure.QuerySelector("figcaption").InnerText.Trim();
 
-                images.Add(new Image()
+                if (!string.IsNullOrWhiteSpace(bestUrl))
                 {
-                    Url = imgUrl,
-                    Caption = caption
-                });
+                    images.Add(new Image()
+                    {
+                        Url = bestUrl,
+                        Caption = caption
+                    });
+                }
                 figure.Remove();
             }
 
