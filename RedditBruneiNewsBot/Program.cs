@@ -10,6 +10,7 @@ using RedditBruneiNewsBot.Services;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -24,7 +25,7 @@ namespace RedditBruneiNewsBot
         private static readonly int _retryInterval = 60000;
         private static List<Subreddit> _subreddits { get; set; } = new List<Subreddit>();
         private static ImgurService _imgurService;
-        private static string[] _proxies;
+        private static string _proxyHost;
         private static int _proxyPort;
         private static string _proxyUsername;
         private static string _proxyPassword;
@@ -52,10 +53,18 @@ namespace RedditBruneiNewsBot
             _imgurService = new ImgurService(configuration["Imgur:ClientId"]);
 
             // get proxy config
-            _proxies = configuration["Proxy:Hosts"].Split(";");
-            _proxyPort = Int32.Parse(configuration["Proxy:Port"]);
-            _proxyUsername = configuration["Proxy:Username"];
-            _proxyPassword = configuration["Proxy:Password"];
+            try
+            {
+                _proxyHost = configuration["Proxy:Host"];
+                _proxyPort = Int32.Parse(configuration["Proxy:Port"]);
+                _proxyUsername = configuration["Proxy:Username"];
+                _proxyPassword = configuration["Proxy:Password"];
+            }
+            catch (System.Exception)
+            {
+                _proxyHost = "";
+                Console.WriteLine("Failed to get proxy from configuration. Using direct connection.");
+            }
 
             Console.WriteLine($"Logged in as: {reddit.Account.Me.Name}");
 
@@ -151,7 +160,11 @@ namespace RedditBruneiNewsBot
         private static async Task<StringBuilder> GetBorneoBulletinArticle(Uri uri)
         {
             // set up proxy
-            var proxy = new HttpToSocks5Proxy(_proxies[0], _proxyPort, _proxyUsername, _proxyPassword);
+            IWebProxy proxy = null;
+            if (!string.IsNullOrWhiteSpace(_proxyHost))
+            {
+                proxy = new HttpToSocks5Proxy(_proxyHost, _proxyPort, _proxyUsername, _proxyPassword);
+            }
             var handler = new HttpClientHandler { Proxy = proxy };
 
             using var httpClient = new HttpClient(handler, true);
@@ -160,6 +173,13 @@ namespace RedditBruneiNewsBot
             response.EnsureSuccessStatusCode();
             var doc = new HtmlDocument();
             doc.LoadHtml(await response.Content.ReadAsStringAsync());
+
+            // check for paywall
+            var paywall = doc.QuerySelector(".leaky_paywall_message_wrap");
+            if (paywall != null)
+            {
+                throw new Exception("Paywall detected!");
+            }
 
             var contentNode = doc.QuerySelector(".td-post-content");
 
