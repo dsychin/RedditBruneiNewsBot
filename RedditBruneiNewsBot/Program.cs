@@ -191,14 +191,7 @@ namespace RedditBruneiNewsBot
                 // get images in article
                 var img = figure.QuerySelector("img");
                 var imgSrcSet = img.GetAttributeValue("srcset", "");
-
-                // get url from srcset
-                var pattern = @"(https://\S+) (\d+)w";
-                var matches = Regex.Matches(imgSrcSet, pattern);
-                var bestUrl = matches
-                    .OrderByDescending(x => Int32.Parse(x.Groups[2].Value))
-                    .Select(x => x.Groups[1].Value)
-                    .FirstOrDefault();
+                var bestUrl = GetBestUrlFromSrcset(imgSrcSet);
 
                 var caption = figure.QuerySelector("figcaption").InnerText.Trim();
 
@@ -211,6 +204,25 @@ namespace RedditBruneiNewsBot
                     });
                 }
                 figure.Remove();
+            }
+
+            // Get any remaining images not in figure element
+            var imgNodes = contentNode.QuerySelectorAll("img");
+            foreach (var img in imgNodes)
+            {
+                // get url from srcset
+                var imgSrcSet = img.GetAttributeValue("srcset", "");
+                var bestUrl = GetBestUrlFromSrcset(imgSrcSet);
+
+                if (!string.IsNullOrWhiteSpace(bestUrl))
+                {
+                    images.Add(new Image()
+                    {
+                        Url = bestUrl,
+                        Caption = ""
+                    });
+                }
+                img.Remove();
             }
 
             // Add images to Imgur
@@ -252,6 +264,17 @@ namespace RedditBruneiNewsBot
             }
 
             return builder;
+        }
+
+        private static string GetBestUrlFromSrcset(string imgSrcSet)
+        {
+            var pattern = @"(https://\S+) (\d+)w";
+            var matches = Regex.Matches(imgSrcSet, pattern);
+            var bestUrl = matches
+                .OrderByDescending(x => Int32.Parse(x.Groups[2].Value))
+                .Select(x => x.Groups[1].Value)
+                .FirstOrDefault();
+            return bestUrl;
         }
 
         private static async Task<StringBuilder> GetTheScoopArticle(Uri uri)
