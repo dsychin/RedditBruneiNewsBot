@@ -37,6 +37,12 @@ This repository includes the code for the `brunei_news_bot` reddit account which
     "Imgur": {
         "ClientId": ""
     },
+    "Proxy": {
+        "Host": "",
+        "Port": 80,
+        "Username": "",
+        "Password": ""
+    },
     "Subreddits": "testingground4bots"
 }
 ```

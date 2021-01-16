@@ -1,28 +1,34 @@
 ﻿using HtmlAgilityPack;
+using HtmlAgilityPack.CssSelectors.NetCore;
 using Microsoft.Extensions.Configuration;
+using MihaZupan;
 using Reddit;
 using Reddit.Controllers;
 using Reddit.Controllers.EventArgs;
 using RedditBruneiNewsBot.Models;
+using RedditBruneiNewsBot.Services;
 using System;
 using System.Collections.Generic;
-using HtmlAgilityPack.CssSelectors.NetCore;
-using System.Text;
-using System.Net.Http;
-using System.Threading.Tasks;
 using System.Linq;
-using RedditBruneiNewsBot.Services;
+using System.Net;
+using System.Net.Http;
+using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace RedditBruneiNewsBot
 {
     class Program
     {
-        private static readonly string _version = "v0.3.0";
-        private static readonly int _maxRetries = 5;
-        private static readonly int _retryInterval = 60000;
+        private static readonly string _version = "v0.4.0";
+        private static readonly int _maxRetries = 15;
+        private static readonly int _retryInterval = 30000;
         private static List<Subreddit> _subreddits { get; set; } = new List<Subreddit>();
         private static ImgurService _imgurService;
+        private static string _proxyHost;
+        private static int _proxyPort;
+        private static string _proxyUsername;
+        private static string _proxyPassword;
 
         static void Main(string[] args)
         {
@@ -37,11 +43,28 @@ namespace RedditBruneiNewsBot
                 .AddCommandLine(args);
             var configuration = builder.Build();
 
+            // get reddit config
             var redditConfig = configuration.GetSection("Reddit").Get<RedditConfig>();
 
             var reddit = new RedditClient(
                 redditConfig.AppId, redditConfig.RefreshToken, redditConfig.Secret);
+
+            // get imgur config
             _imgurService = new ImgurService(configuration["Imgur:ClientId"]);
+
+            // get proxy config
+            try
+            {
+                _proxyHost = configuration["Proxy:Host"];
+                _proxyPort = Int32.Parse(configuration["Proxy:Port"]);
+                _proxyUsername = configuration["Proxy:Username"];
+                _proxyPassword = configuration["Proxy:Password"];
+            }
+            catch (System.Exception)
+            {
+                _proxyHost = "";
+                Console.WriteLine("Failed to get proxy from configuration. Using direct connection.");
+            }
 
             Console.WriteLine($"Logged in as: {reddit.Account.Me.Name}");
 
@@ -107,7 +130,10 @@ namespace RedditBruneiNewsBot
                             {
                                 // add footer
                                 builder.AppendLine("***");
-                                builder.Append($"^([ )[^(Give feedback)](https://www.reddit.com/message/compose?to=brunei_news_bot)^( | )[^(Code)](https://github.com/dsychin/RedditBruneiNewsBot)^( ] {_version})");
+                                builder.Append($@"^([ )[^(Give feedback)](https://www.reddit.com/message/compose?to=brunei_news_bot)
+                                ^( | )[^(Code)](https://github.com/dsychin/RedditBruneiNewsBot)
+                                ^( | )[^(Changelog)](https://github.com/dsychin/RedditBruneiNewsBot/releases)
+                                ^( ] {_version})");
 
                                 var reply = linkPost.Reply(builder.ToString());
                                 Console.WriteLine($"Replied: {reply.Permalink}");
@@ -136,11 +162,27 @@ namespace RedditBruneiNewsBot
 
         private static async Task<StringBuilder> GetBorneoBulletinArticle(Uri uri)
         {
-            using var httpClient = new HttpClient();
+            // set up proxy
+            IWebProxy proxy = null;
+            if (!string.IsNullOrWhiteSpace(_proxyHost))
+            {
+                proxy = new HttpToSocks5Proxy(_proxyHost, _proxyPort, _proxyUsername, _proxyPassword);
+            }
+            var handler = new HttpClientHandler { Proxy = proxy };
+
+            using var httpClient = new HttpClient(handler, true);
+
             var response = await httpClient.GetAsync(uri.ToString());
             response.EnsureSuccessStatusCode();
             var doc = new HtmlDocument();
             doc.LoadHtml(await response.Content.ReadAsStringAsync());
+
+            // check for paywall
+            var paywall = doc.QuerySelector(".leaky_paywall_message_wrap");
+            if (paywall != null)
+            {
+                throw new Exception("Paywall detected!");
+            }
 
             var contentNode = doc.QuerySelector(".td-post-content");
 
@@ -152,20 +194,38 @@ namespace RedditBruneiNewsBot
                 // get images in article
                 var img = figure.QuerySelector("img");
                 var imgSrcSet = img.GetAttributeValue("srcset", "");
-
-                // get url from srcset
-                var pattern = @"(https://\S+)";
-                var match = Regex.Match(imgSrcSet, pattern, RegexOptions.RightToLeft);
-                var imgUrl = match.Value;
+                var bestUrl = GetBestUrlFromSrcset(imgSrcSet);
 
                 var caption = figure.QuerySelector("figcaption").InnerText.Trim();
 
-                images.Add(new Image()
+                if (!string.IsNullOrWhiteSpace(bestUrl))
                 {
-                    Url = imgUrl,
-                    Caption = caption
-                });
+                    images.Add(new Image()
+                    {
+                        Url = bestUrl,
+                        Caption = caption
+                    });
+                }
                 figure.Remove();
+            }
+
+            // Get any remaining images not in figure element
+            var imgNodes = contentNode.QuerySelectorAll("img");
+            foreach (var img in imgNodes)
+            {
+                // get url from srcset
+                var imgSrcSet = img.GetAttributeValue("srcset", "");
+                var bestUrl = GetBestUrlFromSrcset(imgSrcSet);
+
+                if (!string.IsNullOrWhiteSpace(bestUrl))
+                {
+                    images.Add(new Image()
+                    {
+                        Url = bestUrl,
+                        Caption = ""
+                    });
+                }
+                img.Remove();
             }
 
             // Add images to Imgur
@@ -207,6 +267,17 @@ namespace RedditBruneiNewsBot
             }
 
             return builder;
+        }
+
+        private static string GetBestUrlFromSrcset(string imgSrcSet)
+        {
+            var pattern = @"(https://\S+) (\d+)w";
+            var matches = Regex.Matches(imgSrcSet, pattern);
+            var bestUrl = matches
+                .OrderByDescending(x => Int32.Parse(x.Groups[2].Value))
+                .Select(x => x.Groups[1].Value)
+                .FirstOrDefault();
+            return bestUrl;
         }
 
         private static async Task<StringBuilder> GetTheScoopArticle(Uri uri)
