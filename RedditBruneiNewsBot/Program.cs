@@ -20,7 +20,7 @@ namespace RedditBruneiNewsBot
 {
     class Program
     {
-        private static readonly string _version = "v0.4.0";
+        private static readonly string _version = "v0.5.0";
         private static readonly int _maxRetries = 15;
         private static readonly int _retryInterval = 30000;
         private static List<Subreddit> _subreddits { get; set; } = new List<Subreddit>();
@@ -92,6 +92,12 @@ namespace RedditBruneiNewsBot
         {
             foreach (Post post in e.Added)
             {
+                if (post.Created <= DateTime.UtcNow.AddDays(-1))
+                {
+                    Console.WriteLine("Ignoring post created older than 1 day.");
+                    break;
+                }
+
                 Console.WriteLine("New Post by " + post.Author + ": " + post.Title);
                 if (!post.Listing.IsSelf)
                 {
@@ -119,6 +125,11 @@ namespace RedditBruneiNewsBot
                                 case "www.thescoop.co":
                                     Console.WriteLine("Found The Scoop");
                                     builder = await GetTheScoopArticle(uri);
+                                    break;
+                                case "thebruneian.news":
+                                case "www.thebruneian.news":
+                                    Console.WriteLine("Found The Bruneian News");
+                                    builder = await GetTheBruneianNewsArticle(uri);
                                     break;
                                 default:
                                     isSupported = false;
@@ -252,6 +263,127 @@ namespace RedditBruneiNewsBot
 
             // add date
             var date = doc.QuerySelector(".td-post-title time").InnerText;
+            builder.Append($"^({date})\n\n");
+
+            // add link to image album
+            if (!string.IsNullOrWhiteSpace(albumLink))
+            {
+                builder.Append($"[View Images]({albumLink})\n\n");
+            }
+
+            // add content
+            foreach (var line in contentNode.ChildNodes)
+            {
+                builder.Append(line.InnerText + "\n\n");
+            }
+
+            return builder;
+        }
+
+        private static async Task<StringBuilder> GetTheBruneianNewsArticle(Uri uri)
+        {
+            // set up proxy
+            IWebProxy proxy = null;
+            if (!string.IsNullOrWhiteSpace(_proxyHost))
+            {
+                proxy = new HttpToSocks5Proxy(_proxyHost, _proxyPort, _proxyUsername, _proxyPassword);
+            }
+            var handler = new HttpClientHandler { Proxy = proxy };
+
+            using var httpClient = new HttpClient(handler, true);
+
+            var response = await httpClient.GetAsync(uri.ToString());
+            response.EnsureSuccessStatusCode();
+            var doc = new HtmlDocument();
+            doc.LoadHtml(await response.Content.ReadAsStringAsync());
+
+            var contentNode = doc.QuerySelector(".entry-content");
+
+            // remove ad space
+            var ads = contentNode.QuerySelectorAll("div.code-block");
+            foreach (var ad in ads)
+            {
+                ad.Remove();
+            }
+
+            // remove view counter
+            var viewCounter = contentNode.QuerySelectorAll(".post-views");
+            foreach (var view in viewCounter)
+            {
+                view.Remove();
+            }
+
+            // remove images and captions from doc
+            var images = new List<Image>();
+            var figures = contentNode.QuerySelectorAll("figure");
+            foreach (var figure in figures)
+            {
+                // get images in article
+                var img = figure.QuerySelector("img");
+                var imgSrcSet = img.GetAttributeValue("srcset", "");
+                var bestUrl = GetBestUrlFromSrcset(imgSrcSet);
+
+                var figcaption = figure.QuerySelector("figcaption");
+                var caption = "";
+                if (figcaption != null)
+                {
+                    caption = figcaption.InnerText.Trim();
+                }
+
+                if (!string.IsNullOrWhiteSpace(bestUrl))
+                {
+                    images.Add(new Image()
+                    {
+                        Url = bestUrl,
+                        Caption = caption
+                    });
+                }
+                figure.Remove();
+            }
+
+            // Get any remaining images not in figure element
+            var imgNodes = contentNode.QuerySelectorAll("img");
+            foreach (var img in imgNodes)
+            {
+                // get url from srcset
+                var imgSrcSet = img.GetAttributeValue("srcset", "");
+                var bestUrl = GetBestUrlFromSrcset(imgSrcSet);
+
+                if (!string.IsNullOrWhiteSpace(bestUrl))
+                {
+                    images.Add(new Image()
+                    {
+                        Url = bestUrl,
+                        Caption = ""
+                    });
+                }
+                img.Remove();
+            }
+
+            // Add images to Imgur
+            var albumLink = "";
+            if (images.Any())
+            {
+                try
+                {
+                    albumLink = await _imgurService.CreateAlbumFromImagesAsync(images);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error creating image album!\n{uri.ToString()}");
+                    Console.WriteLine(ex.ToString());
+                }
+            }
+
+            // build output text
+            var builder = new StringBuilder();
+
+            // add title
+            var title = doc.QuerySelector("h1.headline").InnerText;
+            builder.Append($"# {title}\n\n");
+
+            // add date
+            var date = doc.QuerySelector("span.entry-date").InnerText;
             builder.Append($"^({date})\n\n");
 
             // add link to image album

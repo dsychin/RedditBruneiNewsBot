@@ -15,6 +15,7 @@ This repository includes the code for the `brunei_news_bot` reddit account which
 1. Supported Websites:
     - [Borneo Bulletin](https://www.borneobulletin.com.bn)
     - [The Scoop](https://thescoop.co)
+    - [The Bruneian News](https://www.thebruneian.news/)
 2. Posts a comment reply with the news title, date and content.
 
 ## Running the bot
