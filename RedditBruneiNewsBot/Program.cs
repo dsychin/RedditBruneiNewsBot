@@ -20,7 +20,7 @@ namespace RedditBruneiNewsBot
 {
     class Program
     {
-        private static readonly string _version = "v0.4.0";
+        private static readonly string _version = "v0.5.0";
         private static readonly int _maxRetries = 15;
         private static readonly int _retryInterval = 30000;
         private static List<Subreddit> _subreddits { get; set; } = new List<Subreddit>();
