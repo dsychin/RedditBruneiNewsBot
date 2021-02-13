@@ -92,6 +92,12 @@ namespace RedditBruneiNewsBot
         {
             foreach (Post post in e.Added)
             {
+                Console.WriteLine(post.Created);
+                if (post.Created <= DateTime.UtcNow.AddDays(1))
+                {
+                    Console.WriteLine("Ignoring post created older than 1 day.");
+                }
+
                 Console.WriteLine("New Post by " + post.Author + ": " + post.Title);
                 if (!post.Listing.IsSelf)
                 {
