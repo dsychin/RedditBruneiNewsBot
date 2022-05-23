@@ -258,11 +258,11 @@ namespace RedditBruneiNewsBot
             var builder = new StringBuilder();
 
             // add title
-            var title = doc.QuerySelector(".td-post-title h1").InnerText;
+            var title = doc.QuerySelector(".tdb-title-text").InnerText;
             builder.Append($"# {title}\n\n");
 
             // add date
-            var date = doc.QuerySelector(".td-post-title time").InnerText;
+            var date = doc.QuerySelector("time.entry-date").InnerText;
             builder.Append($"^({date})\n\n");
 
             // add link to image album
