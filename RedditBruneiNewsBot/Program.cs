@@ -195,7 +195,7 @@ namespace RedditBruneiNewsBot
                 throw new Exception("Paywall detected!");
             }
 
-            var contentNode = doc.QuerySelector(".td-post-content");
+            var contentNode = doc.QuerySelector(".td-post-content .tdb-block-inner");
 
             // remove images and captions from doc
             var images = new List<Image>();
