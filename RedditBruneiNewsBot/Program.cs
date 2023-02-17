@@ -182,6 +182,7 @@ namespace RedditBruneiNewsBot
             var handler = new HttpClientHandler { Proxy = proxy };
 
             using var httpClient = new HttpClient(handler, true);
+            httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36");
 
             var response = await httpClient.GetAsync(uri.ToString());
             response.EnsureSuccessStatusCode();
