@@ -14,13 +14,20 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace RedditBruneiNewsBot
 {
+    public class CFClearanceResponse
+    {
+        public string Source { get; set; }
+        public int Code { get; set; }
+    }
+
     class Program
     {
-        private static readonly string _version = "v0.5.1";
+        private static readonly string _version = "v0.5.2";
         private static readonly int _maxRetries = 15;
         private static readonly int _retryInterval = 30000;
         private static List<Subreddit> _subreddits { get; set; } = new List<Subreddit>();
@@ -173,21 +180,44 @@ namespace RedditBruneiNewsBot
 
         private static async Task<StringBuilder> GetBorneoBulletinArticle(Uri uri)
         {
-            // set up proxy
-            IWebProxy proxy = null;
-            if (!string.IsNullOrWhiteSpace(_proxyHost))
+            using var httpClient = new HttpClient();
+
+            var requestUrl = "http://localhost:3000/cf-clearance-scraper";
+
+            var requestBody = new
             {
-                proxy = new HttpToSocks5Proxy(_proxyHost, _proxyPort, _proxyUsername, _proxyPassword);
-            }
-            var handler = new HttpClientHandler { Proxy = proxy };
+                url = uri.ToString(),
+                mode = "source",
+                // NOTE: currently disabled due to proxy IPs being blocked
+                // proxy = new
+                // {
+                //     host = _proxyHost,
+                //     port = _proxyPort,
+                //     username = _proxyUsername,
+                //     password = _proxyPassword
+                // }
+            };
 
-            using var httpClient = new HttpClient(handler, true);
-            httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36");
+            var json = JsonSerializer.Serialize(requestBody);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await httpClient.GetAsync(uri.ToString());
+            var response = await httpClient.PostAsync(requestUrl, content);
+
             response.EnsureSuccessStatusCode();
+
+            var responseString = await response.Content.ReadAsStringAsync();
+            var options = new JsonSerializerOptions{
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
+            var responseJson = JsonSerializer.Deserialize<CFClearanceResponse>(responseString, options);
+
+            if (responseJson.Code != 200)
+            {
+                throw new Exception("Error from CF Clearance: " + responseString);
+            }
+
             var doc = new HtmlDocument();
-            doc.LoadHtml(await response.Content.ReadAsStringAsync());
+            doc.LoadHtml(responseJson.Source);
 
             // check for paywall
             var paywall = doc.QuerySelector(".leaky_paywall_message_wrap");
@@ -454,4 +484,5 @@ namespace RedditBruneiNewsBot
             return builder;
         }
     }
+
 }

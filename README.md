@@ -13,21 +13,31 @@ This repository includes the code for the `brunei_news_bot` reddit account which
 ## Features
 
 1. Supported Websites:
-    - [Borneo Bulletin](https://www.borneobulletin.com.bn)
-    - [The Scoop](https://thescoop.co)
-    - [The Bruneian News](https://www.thebruneian.news/)
+   - [Borneo Bulletin](https://www.borneobulletin.com.bn)
+   - [The Scoop](https://thescoop.co)
+   - [The Bruneian News](https://www.thebruneian.news/)
 2. Posts a comment reply with the news title, date and content.
 
 ## Running the bot
 
 ### Prerequisites
 
-1. [.NET 5.0 SDK](https://dotnet.microsoft.com/download)
+1. [.NET 8.0 SDK](https://dotnet.microsoft.com/download)
 2. Windows/Linux/Mac
+3. Docker container running `cf-clearance-scraper`
+
+```
+docker run -d -p 3000:3000 \
+-e PORT=3000 \
+-e browserLimit=20 \
+-e timeOut=60000 \
+zfcsoftware/cf-clearance-scraper:latest
+```
 
 ### Developing locally
 
 1. Create `appsettings.json` in project folder with the following structure.
+
 ```
 {
     "Reddit": {
@@ -56,13 +66,14 @@ This repository includes the code for the `brunei_news_bot` reddit account which
 2. Run `dotnet build -c Release -o app`.
 3. This will create a build in the `app` folder.
 4. Build configuration can be customised. E.g. To create a single `.exe` file that runs on Windows, etc.
-Please refer to the [Microsoft Docs](https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-build) for further information.
+   Please refer to the [Microsoft Docs](https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-build) for further information.
 
 ### Running on the server
 
 1. Copy the `app` folder from the previous section to somewhere safe on the server.
 2. Change working directory into the `app` folder.
 3. Update `appsettings.json` or set it through environment variables. E.g.
+
 ```
 Reddit__Secret=123
 Reddit__AppId=123
@@ -70,4 +81,5 @@ Reddit__RefreshToken=123
 Imgur__ClientId=123
 Subreddits=123,456
 ```
+
 4. Run `dotnet RedditBruneiNewsBot.dll`.
