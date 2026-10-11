@@ -31,7 +31,7 @@ func TestReplyFromSupportedSiteFixtures(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.True(t, strings.HasPrefix(reply, "**"+tt.title+"**\n\n"+tt.firstWords), reply)
-			assert.True(t, strings.HasSuffix(reply, "\n\n---\n\nBot v2.00"), reply)
+			assert.True(t, strings.HasSuffix(reply, "\n\n***\n\n^(v2.00)"), reply)
 			assert.NotContains(t, reply, "Truncated")
 			assert.NotContains(t, reply, "Copyright")
 		})
@@ -56,7 +56,7 @@ func TestReplyTruncatesLongArticleWithURLMarker(t *testing.T) {
 	reply, err := Reply(strings.NewReader(page), u, "v2.00")
 	require.NoError(t, err)
 
-	assert.Contains(t, reply, "\n\n[Truncated - read the full article at https://example.com/long]\n\n---\n\nBot v2.00")
+	assert.Contains(t, reply, "\n\n[Truncated - read the full article at https://example.com/long]\n\n***\n\n^(v2.00)")
 	assert.LessOrEqual(t, utf8.RuneCountInString(reply), 10000)
 }
 

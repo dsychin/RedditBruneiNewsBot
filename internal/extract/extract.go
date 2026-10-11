@@ -30,7 +30,7 @@ var (
 var blankLines = regexp.MustCompile(`\n\s*\n+`)
 
 // Reply builds the reply markdown for an article page fetched from pageURL,
-// ending with a footer that shows only the bot version.
+// ending with a small footer that shows only the bot version.
 // It returns ErrNoTitle or ErrTextTooShort when the article should be skipped.
 func Reply(page io.Reader, pageURL *url.URL, version string) (string, error) {
 	article, err := readability.FromReader(page, pageURL)
@@ -59,7 +59,7 @@ func Reply(page io.Reader, pageURL *url.URL, version string) (string, error) {
 	if truncated {
 		reply += "\n\n[Truncated - read the full article at " + pageURL.String() + "]"
 	}
-	return reply + "\n\n---\n\nBot " + version, nil
+	return reply + "\n\n***\n\n^(" + version + ")", nil
 }
 
 // CleanTitle trims whitespace and strips a trailing known site-name suffix.
