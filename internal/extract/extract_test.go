@@ -48,6 +48,33 @@ func TestReplySkipsMissingTitleAndShortText(t *testing.T) {
 	assert.ErrorIs(t, err, ErrTextTooShort)
 }
 
+func TestReplyTextLengthBoundary(t *testing.T) {
+	u, _ := url.Parse("https://example.com/a")
+	page := func(n int) string {
+		return "<html><head><title>Story</title></head><body><p>" + strings.Repeat("a", n) + "</p></body></html>"
+	}
+
+	_, err := Reply(strings.NewReader(page(MinTextRunes-1)), u, "v2.00")
+	assert.ErrorIs(t, err, ErrTextTooShort)
+
+	_, err = Reply(strings.NewReader(page(MinTextRunes)), u, "v2.00")
+	assert.NoError(t, err)
+}
+
+func TestReplyStaysWithinRedditLimitWithLongTitleAndURL(t *testing.T) {
+	u, err := url.Parse("https://example.com/" + strings.Repeat("x", 1500))
+	require.NoError(t, err)
+	title := strings.Repeat("T", 400)
+	para := "<p>" + strings.Repeat("This is a sentence. ", 40) + "</p>"
+	page := "<html><head><title>" + title + "</title></head><body><article>" + strings.Repeat(para, 20) + "</article></body></html>"
+
+	reply, err := Reply(strings.NewReader(page), u, "v2.00")
+	require.NoError(t, err)
+
+	assert.LessOrEqual(t, utf8.RuneCountInString(reply), MaxReplyRunes)
+	assert.Contains(t, reply, "[Truncated - read the full article at "+u.String()+"]")
+}
+
 func TestReplyTruncatesLongArticleWithURLMarker(t *testing.T) {
 	u, _ := url.Parse("https://example.com/long")
 	para := "<p>" + strings.Repeat("This is a sentence. ", 40) + "</p>"
@@ -57,7 +84,7 @@ func TestReplyTruncatesLongArticleWithURLMarker(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Contains(t, reply, "\n\n[Truncated - read the full article at https://example.com/long]\n\n***\n\n^(v2.00)")
-	assert.LessOrEqual(t, utf8.RuneCountInString(reply), 10000)
+	assert.LessOrEqual(t, utf8.RuneCountInString(reply), MaxReplyRunes)
 }
 
 func TestCleanTitle(t *testing.T) {

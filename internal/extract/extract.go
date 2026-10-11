@@ -18,6 +18,8 @@ import (
 const (
 	// MaxBodyRunes is the cap on article text, in runes.
 	MaxBodyRunes = 9500
+	// MaxReplyRunes is Reddit's comment length limit, in runes.
+	MaxReplyRunes = 10000
 	// MinTextRunes is the minimum article text length worth replying with.
 	MinTextRunes = 200
 )
@@ -54,12 +56,23 @@ func Reply(page io.Reader, pageURL *url.URL, version string) (string, error) {
 		return "", ErrTextTooShort
 	}
 
-	body, truncated := Truncate(body, MaxBodyRunes)
-	reply := "**" + title + "**\n\n" + body
-	if truncated {
-		reply += "\n\n[Truncated - read the full article at " + pageURL.String() + "]"
+	header := "**" + title + "**\n\n"
+	marker := "\n\n[Truncated - read the full article at " + pageURL.String() + "]"
+	footer := "\n\n***\n\n^(" + version + ")"
+
+	// Reserve room for the marker so a long title or URL cannot push the reply over Reddit's limit.
+	overhead := utf8.RuneCountInString(header + marker + footer)
+	bodyCap := min(MaxBodyRunes, MaxReplyRunes-overhead)
+	if bodyCap < MinTextRunes {
+		return "", ErrTextTooShort
 	}
-	return reply + "\n\n***\n\n^(" + version + ")", nil
+
+	body, truncated := Truncate(body, bodyCap)
+	reply := header + body
+	if truncated {
+		reply += marker
+	}
+	return reply + footer, nil
 }
 
 // CleanTitle trims whitespace and strips a trailing known site-name suffix.
