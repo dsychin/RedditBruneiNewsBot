@@ -16,9 +16,6 @@ func TestLoadUsesSafeDefaultsAndParsesSubreddits(t *testing.T) {
 		t.Fatalf("load returned an error: %v", err)
 	}
 
-	if cfg.Mode != "test" {
-		t.Errorf("Mode = %q, want test", cfg.Mode)
-	}
 	if cfg.RetryBaseDelay != time.Minute {
 		t.Errorf("RetryBaseDelay = %s, want 1m", cfg.RetryBaseDelay)
 	}
@@ -54,8 +51,8 @@ func TestReadValuesUsesDefaultsWhenOptionalFileIsMissing(t *testing.T) {
 		t.Fatalf("load returned an error: %v", err)
 	}
 
-	if cfg.Mode != defaultMode || cfg.DryRun || cfg.RetryBaseDelay != defaultRetryBaseDelay || cfg.RetryWindow != defaultRetryWindow {
-		t.Errorf("unexpected defaults: mode=%q dry_run=%t retry_base_delay=%s retry_window=%s", cfg.Mode, cfg.DryRun, cfg.RetryBaseDelay, cfg.RetryWindow)
+	if cfg.DryRun || cfg.RetryBaseDelay != defaultRetryBaseDelay || cfg.RetryWindow != defaultRetryWindow {
+		t.Errorf("unexpected defaults: dry_run=%t retry_base_delay=%s retry_window=%s", cfg.DryRun, cfg.RetryBaseDelay, cfg.RetryWindow)
 	}
 	if len(cfg.Subreddits) != 1 || cfg.Subreddits[0] != defaultSubreddits {
 		t.Errorf("Subreddits = %#v, want [%s]", cfg.Subreddits, defaultSubreddits)
@@ -85,7 +82,6 @@ func TestLoadValidatesRequiredValuesAndFormats(t *testing.T) {
 
 func TestLoadRejectsInvalidSettings(t *testing.T) {
 	_, err := load(validValues(map[string]string{
-		"BOT_MODE":                 "staging",
 		"DRY_RUN":                  "sometimes",
 		"RETRY_BASE_DELAY":         "soon",
 		"RETRY_WINDOW":             "30s",
@@ -97,7 +93,6 @@ func TestLoadRejectsInvalidSettings(t *testing.T) {
 	}
 
 	for _, want := range []string{
-		"BOT_MODE must be either",
 		"DRY_RUN must be a boolean",
 		"RETRY_BASE_DELAY must be a positive duration",
 		"RETRY_WINDOW must be greater than or equal to RETRY_BASE_DELAY",
@@ -112,7 +107,6 @@ func TestLoadRejectsInvalidSettings(t *testing.T) {
 
 func TestLoadAcceptsConfiguredValues(t *testing.T) {
 	cfg, err := load(validValues(map[string]string{
-		"BOT_MODE":                 "PRODUCTION",
 		"DRY_RUN":                  "true",
 		"RETRY_BASE_DELAY":         "2m",
 		"RETRY_WINDOW":             "12h",
@@ -124,8 +118,8 @@ func TestLoadAcceptsConfiguredValues(t *testing.T) {
 		t.Fatalf("load returned an error: %v", err)
 	}
 
-	if cfg.Mode != "production" || cfg.RetryBaseDelay != 2*time.Minute || cfg.RetryWindow != 12*time.Hour {
-		t.Errorf("unexpected config values: mode=%q retry_base_delay=%s retry_window=%s", cfg.Mode, cfg.RetryBaseDelay, cfg.RetryWindow)
+	if cfg.RetryBaseDelay != 2*time.Minute || cfg.RetryWindow != 12*time.Hour {
+		t.Errorf("unexpected config values: retry_base_delay=%s retry_window=%s", cfg.RetryBaseDelay, cfg.RetryWindow)
 	}
 	if !cfg.DryRun {
 		t.Error("DryRun = false, want true")
@@ -185,7 +179,6 @@ func clearConfigEnvironment(t *testing.T) {
 		"REDDIT_CLIENT_SECRET",
 		"REDDIT_REFRESH_TOKEN",
 		"SUBREDDITS",
-		"BOT_MODE",
 		"DRY_RUN",
 		"RETRY_BASE_DELAY",
 		"RETRY_WINDOW",
@@ -213,7 +206,6 @@ func validValues(overrides map[string]string) stringGetter {
 		"REDDIT_CLIENT_SECRET":     "client-secret",
 		"REDDIT_REFRESH_TOKEN":     "refresh-token",
 		"SUBREDDITS":               defaultSubreddits,
-		"BOT_MODE":                 defaultMode,
 		"DRY_RUN":                  "false",
 		"RETRY_BASE_DELAY":         defaultRetryBaseDelay.String(),
 		"RETRY_WINDOW":             defaultRetryWindow.String(),

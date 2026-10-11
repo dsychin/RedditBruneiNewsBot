@@ -12,7 +12,6 @@ import (
 )
 
 const (
-	defaultMode           = "test"
 	defaultSubreddits     = "testingground4bots"
 	defaultRetryBaseDelay = time.Minute
 	defaultRetryWindow    = 8 * time.Hour
@@ -26,7 +25,6 @@ type Config struct {
 	RedditClientSecret string
 	RedditRefreshToken string
 	Subreddits         []string
-	Mode               string
 	DryRun             bool
 	RetryBaseDelay     time.Duration
 	RetryWindow        time.Duration
@@ -52,7 +50,6 @@ func readValues(path string) (*viper.Viper, error) {
 	values.SetConfigFile(path)
 	values.SetConfigType("env")
 	values.AutomaticEnv()
-	values.SetDefault("BOT_MODE", defaultMode)
 	values.SetDefault("SUBREDDITS", defaultSubreddits)
 	values.SetDefault("DRY_RUN", false)
 	values.SetDefault("RETRY_BASE_DELAY", defaultRetryBaseDelay.String())
@@ -77,7 +74,6 @@ func load(get stringGetter) (Config, error) {
 		RedditClientID:     strings.TrimSpace(get("REDDIT_CLIENT_ID")),
 		RedditClientSecret: strings.TrimSpace(get("REDDIT_CLIENT_SECRET")),
 		RedditRefreshToken: strings.TrimSpace(get("REDDIT_REFRESH_TOKEN")),
-		Mode:               strings.ToLower(strings.TrimSpace(get("BOT_MODE"))),
 		SidecarURL:         strings.TrimSpace(get("CF_CLEARANCE_SCRAPER_URL")),
 		DBPath:             strings.TrimSpace(get("DB_PATH")),
 	}
@@ -94,13 +90,6 @@ func load(get stringGetter) (Config, error) {
 	}
 
 	cfg.Subreddits, errs = parseSubreddits(get("SUBREDDITS"), errs)
-
-	if cfg.Mode == "" {
-		cfg.Mode = defaultMode
-	}
-	if cfg.Mode != "test" && cfg.Mode != "production" {
-		errs = append(errs, "BOT_MODE must be either \"test\" or \"production\"")
-	}
 
 	dryRun := strings.TrimSpace(get("DRY_RUN"))
 	if dryRun != "" {

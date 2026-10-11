@@ -22,14 +22,13 @@ Copy `.env.example` to `.env` and provide the Reddit OAuth client ID, client sec
 | `REDDIT_CLIENT_SECRET` | — | Reddit OAuth application client secret |
 | `REDDIT_REFRESH_TOKEN` | — | Refresh token for the bot account |
 | `SUBREDDITS` | `testingground4bots` | Comma-separated subreddit names |
-| `BOT_MODE` | `test` | Informational label: `test` or `production` |
 | `DRY_RUN` | `false` | Whether to preview work without posting or persisting state |
 | `RETRY_BASE_DELAY` | `1m` | Base retry delay, in Go duration syntax |
 | `RETRY_WINDOW` | `8h` | Maximum retry window, in Go duration syntax |
 | `CF_CLEARANCE_SCRAPER_URL` | `http://cf-clearance-scraper:3000/cf-clearance-scraper` | Sidecar source endpoint |
 | `DB_PATH` | `./data/bot.db` | SQLite database file path |
 
-`BOT_MODE` does not suppress replies. The configured subreddit list determines the target; use `testingground4bots` while validating the bot.
+The configured subreddit list determines where the bot posts; use `testingground4bots` while validating the bot.
 
 ## Run
 

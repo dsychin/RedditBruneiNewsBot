@@ -18,7 +18,6 @@ func main() {
 
 	logger.Info(
 		"bot scaffold initialized",
-		slog.String("mode", cfg.Mode),
 		slog.Any("subreddits", cfg.Subreddits),
 		slog.Bool("dry_run", cfg.DryRun),
 		slog.String("retry_base_delay", cfg.RetryBaseDelay.String()),
