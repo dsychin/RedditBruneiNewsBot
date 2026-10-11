@@ -5,11 +5,14 @@ After=cf-clearance-scraper.service
 
 [Container]
 ContainerName=redditbruneinewsbot
-Image=redditbruneinewsbot.build
+Image=ghcr.io/dsychin/redditbruneinewsbot:latest
+# Pull a newer :latest at every start, and let podman-auto-update.timer roll updates.
+Pull=newer
+AutoUpdate=registry
 Network=redditbruneinewsbot.network
 Volume=redditbruneinewsbot-data.volume:/data
 # Reddit credentials and settings; see README for the file location.
-EnvironmentFile=%h/.config/redditbruneinewsbot/bot.env
+EnvironmentFile=%h/.config/redditbruneinewsbot/.env
 Environment=DB_PATH=/data/bot.db
 Environment=CF_CLEARANCE_SCRAPER_URL=http://cf-clearance-scraper:3000/cf-clearance-scraper
 HealthCmd=/bot healthcheck

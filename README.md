@@ -59,14 +59,14 @@ docker compose up -d --build
 
 ```sh
 mkdir -p ~/.config/redditbruneinewsbot ~/.config/containers/systemd
-cp .env.example ~/.config/redditbruneinewsbot/bot.env   # then fill in the Reddit credentials
-chmod 600 ~/.config/redditbruneinewsbot/bot.env
+cp .env.example ~/.config/redditbruneinewsbot/.env   # then fill in the Reddit credentials
+chmod 600 ~/.config/redditbruneinewsbot/.env
 cp deploy/quadlet/* ~/.config/containers/systemd/
 systemctl --user daemon-reload
 systemctl --user start redditbruneinewsbot.service
 ```
 
-The `.build` unit builds the image from the `main` branch on GitHub. For services to survive logout run `loginctl enable-linger $USER`. Switching to production is a change to `SUBREDDITS` in the env file followed by a restart.
+The Quadlet bot unit pulls `ghcr.io/dsychin/redditbruneinewsbot:latest`, which the `Publish image` GitHub Actions workflow builds and pushes on every push to `main` (plus `sha-*` and, for `v*` tags, version tags). It pulls a newer image on each start, and `AutoUpdate=registry` lets `systemctl --user enable --now podman-auto-update.timer` roll updates automatically. The GHCR package must be public (GitHub package settings) for an unauthenticated pull; otherwise run `podman login ghcr.io` first. For services to survive logout run `loginctl enable-linger $USER`. Switching to production is a change to `SUBREDDITS` in the env file followed by a restart.
 
 ## Development
 
