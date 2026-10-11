@@ -3,6 +3,7 @@ package ingest
 import (
 	"context"
 	"errors"
+	"github.com/dsychin/RedditBruneiNewsBot/internal/fetch"
 	"io"
 	"log/slog"
 	"testing"
@@ -100,7 +101,7 @@ func TestRunCycleAbortsWhenStoredStateCannotBeRead(t *testing.T) {
 	state := &fakeState{err: errors.New("database read failed")}
 	runner := testRunner(client, state, &fakePreviewer{}, now, "first", "second")
 
-	require.ErrorContains(t, runner.RunCycle(context.Background()), "read stored post state")
+	require.ErrorContains(t, runner.RunCycle(context.Background()), ErrState.Error())
 	assert.Equal(t, []string{"first"}, client.subreddits())
 }
 
@@ -160,7 +161,8 @@ func TestRunStartsTheFirstCycleImmediately(t *testing.T) {
 }
 
 func testRunner(client Client, state HandledReader, previewer Previewer, now time.Time, subreddits ...string) *Runner {
-	runner := NewRunner(client, state, previewer, subreddits, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	runner := NewRunner(client, NewDryRunHandler(state, previewer, logger), subreddits, logger)
 	runner.Now = func() time.Time { return now }
 	return runner
 }
@@ -239,13 +241,17 @@ func (s *fakeState) IsHandled(_ context.Context, postID string) (bool, error) {
 type fakePreviewer struct {
 	posts             []string
 	failuresRemaining int
+	err               error
 }
 
 func (p *fakePreviewer) Preview(_ context.Context, submission Submission) (string, error) {
 	p.posts = append(p.posts, submission.ID)
 	if p.failuresRemaining > 0 {
 		p.failuresRemaining--
-		return "", errors.New("preview failed")
+		return "", &fetch.Error{Stage: fetch.StageFetch, Retryable: true, Err: errors.New("preview failed")}
+	}
+	if p.err != nil {
+		return "", p.err
 	}
 	return "reply for " + submission.ID, nil
 }

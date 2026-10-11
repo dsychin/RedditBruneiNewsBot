@@ -5,7 +5,7 @@
 ![GitHub issues](https://img.shields.io/github/issues-raw/dsychin/RedditBruneiNewsBot)
 ![GitHub last commit](https://img.shields.io/github/last-commit/dsychin/RedditBruneiNewsBot)
 
-The Reddit bot monitors configured subreddits for news links, extracts article text, and replies with a formatted summary. The Go rewrite is in progress. Submission ingestion scans recent posts, filters ineligible submissions, and supports read-only dry-run previews. Normal-mode processing and reply posting are not available until the later posting/retry step.
+The Reddit bot monitors configured subreddits for news links, extracts article text, and replies with a formatted summary. The Go rewrite is in progress. Submission ingestion scans recent posts, filters ineligible submissions, posts replies, and retries transient failures. A read-only dry-run mode previews replies without posting.
 
 ## Requirements
 
@@ -36,11 +36,11 @@ The configured subreddit list determines the bot's targets; use `testingground4b
 go run .
 ```
 
-Set `DRY_RUN=true` to start submission ingestion. The bot scans immediately and then on 60-second wall-clock ticks, reading handled-post state from SQLite in read-only mode when the database exists. A missing database is treated as empty; an unreadable database is an error. Dry-run fetches and extracts eligible articles, logs each successful reply preview once per process, and does not post or write SQLite state.
+The bot scans immediately and then on 60-second wall-clock ticks, reading handled-post state from SQLite in read-only mode when the database exists. A missing database is treated as empty; an unreadable database is an error. Dry-run fetches and extracts eligible articles, logs each successful reply preview once per process, and does not post or write SQLite state.
 
 Each scan paginates newest submissions until it reaches the strict 24-hour cutoff; exactly 24-hour-old posts are excluded. Only link posts that are not removed/deleted, locked, archived, or already replied/skipped in SQLite are previewed. Subreddit scans are sequential; partial results are processed when a later page fails, and rate limits defer only the affected subreddit.
 
-With `DRY_RUN=false`, the program exits with an explicit error until reply posting and retry handling are implemented. Invalid settings or state-store failures produce a structured error log and a non-zero exit status.
+With `DRY_RUN=false` (the default), the bot claims each eligible post in SQLite (single instance, enforced by a file lock), fetches and extracts the article, posts the reply, and records it as replied. Retryable failures (network, Reddit rate limits, 5xx, sidecar errors) are scheduled with exponential backoff and jitter from `RETRY_BASE_DELAY` within `RETRY_WINDOW`, and are picked up by a later scan once due; permanent failures are skipped. Posts older than 24 hours are no longer retried. Each failure log includes post id, URL, stage and attempt number. A crash or lost response between posting and recording could cause a duplicate reply. Invalid settings or state-store failures produce a structured error log and a non-zero exit status.
 
 ## Development
 

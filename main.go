@@ -23,35 +23,49 @@ func main() {
 		os.Exit(1)
 	}
 
-	if !cfg.DryRun {
-		logger.Error(
-			"normal processing is unavailable until reply posting is implemented",
-			slog.String("hint", "set DRY_RUN=true to preview submissions"),
-		)
-		os.Exit(1)
-	}
-
-	state, err := store.OpenReadOnly(cfg.DBPath)
-	if err != nil {
-		logger.Error("open state store read-only", slog.String("error", err.Error()))
-		os.Exit(1)
-	}
-	defer func() {
-		if err := state.Close(); err != nil {
-			logger.Error("close read-only state store", slog.String("error", err.Error()))
-		}
-	}()
-
 	reddit := ingest.NewRedditClient(cfg.RedditClientID, cfg.RedditClientSecret, cfg.RedditRefreshToken)
-	articleFetcher := &fetch.Fetcher{SidecarURL: cfg.SidecarURL}
-	previewer := &ingest.ArticlePreviewer{Fetcher: articleFetcher, Version: "v2.00"}
-	runner := ingest.NewRunner(reddit, state, previewer, cfg.Subreddits, logger)
+	previewer := &ingest.ArticlePreviewer{Fetcher: &fetch.Fetcher{SidecarURL: cfg.SidecarURL}, Version: "v2.00"}
+
+	var handler ingest.Handler
+	if cfg.DryRun {
+		state, err := store.OpenReadOnly(cfg.DBPath)
+		if err != nil {
+			logger.Error("open state store read-only", slog.String("error", err.Error()))
+			os.Exit(1)
+		}
+		defer func() {
+			if err := state.Close(); err != nil {
+				logger.Error("close read-only state store", slog.String("error", err.Error()))
+			}
+		}()
+		handler = ingest.NewDryRunHandler(state, previewer, logger)
+	} else {
+		db, err := store.Open(cfg.DBPath)
+		if err != nil {
+			logger.Error("open state store", slog.String("error", err.Error()))
+			os.Exit(1)
+		}
+		defer func() {
+			if err := db.Close(); err != nil {
+				logger.Error("close state store", slog.String("error", err.Error()))
+			}
+		}()
+		handler = &ingest.ReplyHandler{
+			Store:     db,
+			Previewer: previewer,
+			Poster:    reddit,
+			Policy:    fetch.Policy{Base: cfg.RetryBaseDelay, Window: cfg.RetryWindow},
+			Logger:    logger,
+		}
+	}
+	runner := ingest.NewRunner(reddit, handler, cfg.Subreddits, logger)
 
 	logger.Info(
 		"submission ingestion started",
 		slog.Any("subreddits", cfg.Subreddits),
 		slog.Duration("poll_interval", ingest.PollInterval),
 		slog.String("db_path", cfg.DBPath),
+		slog.Bool("dry_run", cfg.DryRun),
 	)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

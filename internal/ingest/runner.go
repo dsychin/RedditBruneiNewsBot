@@ -14,46 +14,40 @@ const (
 	eligibilityWindow = 24 * time.Hour
 )
 
-var errStateRead = errors.New("read stored post state")
+// ErrState marks a failure to read or update stored post state. It aborts the
+// ingestion cycle, since continuing could lose or duplicate work.
+var ErrState = errors.New("stored post state unavailable")
 
-// HandledReader reads terminal post state without changing it.
-type HandledReader interface {
-	IsHandled(context.Context, string) (bool, error)
+// Handler processes one eligible submission. Failures specific to the post
+// are logged and recorded by the handler and returned as nil; only errors
+// wrapping ErrState or ErrAuthentication end the cycle.
+type Handler interface {
+	Handle(context.Context, Submission) error
 }
 
-// Previewer fetches and extracts an eligible submission into its would-be
-// reply, without submitting it to Reddit.
-type Previewer interface {
-	Preview(context.Context, Submission) (string, error)
-}
-
-// Runner polls configured subreddits and previews eligible submissions.
+// Runner polls configured subreddits and hands eligible submissions to a
+// Handler.
 type Runner struct {
 	Client     Client
-	State      HandledReader
-	Previewer  Previewer
+	Handler    Handler
 	Subreddits []string
 	Logger     *slog.Logger
 	Now        func() time.Time
 
-	previewed  map[string]struct{}
 	retryAfter map[string]time.Time
 }
 
-// NewRunner creates an ingestion runner with process-local preview and
-// per-subreddit rate-limit state.
-func NewRunner(client Client, state HandledReader, previewer Previewer, subreddits []string, logger *slog.Logger) *Runner {
+// NewRunner creates an ingestion runner with per-subreddit rate-limit state.
+func NewRunner(client Client, handler Handler, subreddits []string, logger *slog.Logger) *Runner {
 	if logger == nil {
 		logger = slog.Default()
 	}
 	return &Runner{
 		Client:     client,
-		State:      state,
-		Previewer:  previewer,
+		Handler:    handler,
 		Subreddits: append([]string(nil), subreddits...),
 		Logger:     logger,
 		Now:        time.Now,
-		previewed:  make(map[string]struct{}),
 		retryAfter: make(map[string]time.Time),
 	}
 }
@@ -94,11 +88,8 @@ func (r *Runner) RunCycle(ctx context.Context) error {
 	if r.Client == nil {
 		return errors.New("Reddit client is not configured")
 	}
-	if r.State == nil {
-		return errors.New("read-only post state is not configured")
-	}
-	if r.Previewer == nil {
-		return errors.New("submission previewer is not configured")
+	if r.Handler == nil {
+		return errors.New("submission handler is not configured")
 	}
 	now := r.now()
 	cutoff := now.Add(-eligibilityWindow)
@@ -121,7 +112,7 @@ func (r *Runner) RunCycle(ctx context.Context) error {
 		if err == nil {
 			continue
 		}
-		if errors.Is(err, ErrAuthentication) || errors.Is(err, errStateRead) {
+		if errors.Is(err, ErrAuthentication) || errors.Is(err, ErrState) {
 			return err
 		}
 		var apiErr *APIError
@@ -182,36 +173,9 @@ func (r *Runner) scanSubreddit(ctx context.Context, subreddit string, cutoff tim
 				continue
 			}
 			seenThisCycle[post.ID] = struct{}{}
-			if _, previewed := r.previewed[post.ID]; previewed {
-				continue
+			if err := r.Handler.Handle(ctx, post); err != nil {
+				return err
 			}
-
-			handled, err := r.State.IsHandled(ctx, post.ID)
-			if err != nil {
-				return fmt.Errorf("%w: %w", errStateRead, err)
-			}
-			if handled {
-				continue
-			}
-			reply, err := r.Previewer.Preview(ctx, post)
-			if err != nil {
-				r.Logger.Error(
-					"submission preview failed",
-					slog.String("subreddit", subreddit),
-					slog.String("post_id", post.ID),
-					slog.String("url", post.URL),
-					slog.Any("error", err),
-				)
-				continue
-			}
-			r.Logger.Info(
-				"submission reply preview",
-				slog.String("subreddit", subreddit),
-				slog.String("post_id", post.ID),
-				slog.String("url", post.URL),
-				slog.String("reply", reply),
-			)
-			r.previewed[post.ID] = struct{}{}
 		}
 
 		if reachedCutoff || listing.After == "" {

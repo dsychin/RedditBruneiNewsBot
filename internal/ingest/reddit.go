@@ -120,7 +120,16 @@ func (c *RedditClient) NewSubmissions(ctx context.Context, subreddit, after stri
 	}
 	endpoint.RawQuery = query.Encode()
 
-	body, err := c.get(ctx, endpoint.String())
+	target := endpoint.String()
+	body, err := c.do(ctx, func(token string) (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+		if err != nil {
+			return nil, fmt.Errorf("create Reddit listing request: %w", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("User-Agent", redditUserAgent)
+		return req, nil
+	})
 	if err != nil {
 		return Listing{}, err
 	}
@@ -143,22 +152,118 @@ func (c *RedditClient) NewSubmissions(ctx context.Context, subreddit, after stri
 	return listing, nil
 }
 
-func (c *RedditClient) get(ctx context.Context, target string) ([]byte, error) {
+// PostError describes a failed comment submission.
+type PostError struct {
+	Retryable  bool
+	RetryAfter time.Duration
+	Err        error
+}
+
+func (e *PostError) Error() string { return fmt.Sprintf("post comment: %v", e.Err) }
+
+func (e *PostError) Unwrap() error { return e.Err }
+
+// permanentCommentErrors are Reddit error codes that retrying cannot fix.
+var permanentCommentErrors = map[string]bool{
+	"THREAD_LOCKED":            true,
+	"DELETED_LINK":             true,
+	"DELETED_COMMENT":          true,
+	"TOO_OLD":                  true,
+	"SUBREDDIT_NOTALLOWED":     true,
+	"SUBREDDIT_NOEXIST":        true,
+	"USER_BLOCKED":             true,
+	"BANNED_FROM_SUBREDDIT":    true,
+	"NOT_AUTHOR":               true,
+	"SUBREDDIT_OUTBOUND_LINKS": true,
+	"TOO_LONG":                 true,
+	"NO_TEXT":                  true,
+}
+
+// PostComment submits text as a top-level comment on the submission postID.
+// Failures are *PostError values classified as retryable or permanent.
+func (c *RedditClient) PostComment(ctx context.Context, postID, text string) error {
+	baseURL := c.APIBaseURL
+	if baseURL == "" {
+		baseURL = defaultAPIBaseURL
+	}
+	target := strings.TrimRight(baseURL, "/") + "/api/comment"
+	form := url.Values{
+		"api_type": {"json"},
+		"thing_id": {"t3_" + postID},
+		"text":     {text},
+	}
+
+	body, err := c.do(ctx, func(token string) (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, target, strings.NewReader(form.Encode()))
+		if err != nil {
+			return nil, fmt.Errorf("create Reddit comment request: %w", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("User-Agent", redditUserAgent)
+		return req, nil
+	})
+	if err != nil {
+		return classifyPostError(err)
+	}
+
+	var response struct {
+		JSON struct {
+			Errors [][]any `json:"errors"`
+		} `json:"json"`
+	}
+	if err := decodeJSON(body, &response); err != nil {
+		// The comment may have been accepted; a retry risks a duplicate, but an
+		// undecodable response cannot be trusted as success either.
+		return &PostError{Retryable: true, Err: fmt.Errorf("decode Reddit comment response: %w", err)}
+	}
+	if len(response.JSON.Errors) == 0 {
+		return nil
+	}
+	first := response.JSON.Errors[0]
+	code, _ := first[0].(string)
+	message := code
+	if len(first) > 1 {
+		if text, ok := first[1].(string); ok {
+			message = code + ": " + text
+		}
+	}
+	return &PostError{
+		Retryable: !permanentCommentErrors[code],
+		Err:       errors.New("Reddit rejected comment (" + message + ")"),
+	}
+}
+
+func classifyPostError(err error) error {
+	var apiErr *APIError
+	switch {
+	case errors.As(err, &apiErr):
+		retryable := apiErr.StatusCode == http.StatusTooManyRequests ||
+			apiErr.StatusCode == http.StatusRequestTimeout ||
+			apiErr.StatusCode >= 500
+		return &PostError{Retryable: retryable, RetryAfter: apiErr.RetryAfter, Err: err}
+	default:
+		// Authentication and transport failures may clear up on their own.
+		return &PostError{Retryable: true, Err: err}
+	}
+}
+
+// do sends the request built by build, refreshing the access token once if
+// Reddit rejects it. It returns the body of a 200 response.
+func (c *RedditClient) do(ctx context.Context, build func(token string) (*http.Request, error)) ([]byte, error) {
 	for attempt := 0; attempt < 2; attempt++ {
 		token, err := c.token(ctx)
 		if err != nil {
 			return nil, err
 		}
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+		req, err := build(token)
 		if err != nil {
-			return nil, fmt.Errorf("create Reddit listing request: %w", err)
+			return nil, err
 		}
-		req.Header.Set("Authorization", "Bearer "+token)
-		req.Header.Set("User-Agent", redditUserAgent)
 
 		resp, err := c.httpClient().Do(req)
 		if err != nil {
-			return nil, fmt.Errorf("request Reddit listing: %w", err)
+			return nil, fmt.Errorf("request Reddit: %w", err)
 		}
 		if resp.StatusCode == http.StatusUnauthorized && attempt == 0 {
 			_ = resp.Body.Close()
@@ -168,10 +273,10 @@ func (c *RedditClient) get(ctx context.Context, target string) ([]byte, error) {
 		body, readErr := readBody(resp.Body)
 		closeErr := resp.Body.Close()
 		if readErr != nil {
-			return nil, fmt.Errorf("read Reddit listing response: %w", readErr)
+			return nil, fmt.Errorf("read Reddit response: %w", readErr)
 		}
 		if closeErr != nil {
-			return nil, fmt.Errorf("close Reddit listing response: %w", closeErr)
+			return nil, fmt.Errorf("close Reddit response: %w", closeErr)
 		}
 		if resp.StatusCode == http.StatusUnauthorized {
 			return nil, fmt.Errorf("%w: Reddit rejected the refreshed access token", ErrAuthentication)
