@@ -4,82 +4,43 @@
 ![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/dsychin/RedditBruneiNewsBot)
 ![GitHub issues](https://img.shields.io/github/issues-raw/dsychin/RedditBruneiNewsBot)
 ![GitHub last commit](https://img.shields.io/github/last-commit/dsychin/RedditBruneiNewsBot)
-![.NET Core Build](https://github.com/dsychin/RedditBruneiNewsBot/workflows/.NET%20Core%20Build/badge.svg)
 
-## Description
+The Reddit bot monitors configured subreddits for news links, extracts article text, and replies with a formatted summary. The Go rewrite is in progress; this scaffold currently validates configuration, logs safe operational settings, and exits. Reddit intake, persistence, fetching, extraction, and deployment are implemented in subsequent steps.
 
-This repository includes the code for the `brunei_news_bot` reddit account which monitors a list of subreddit for new post with links to news articles and automatically scrape the website for the content and post it as a reply.
+## Requirements
 
-## Features
+- Go 1.27 or newer
+- Reddit OAuth app credentials for the bot account
 
-1. Supported Websites:
-   - [Borneo Bulletin](https://www.borneobulletin.com.bn)
-   - [The Scoop](https://thescoop.co)
-   - [The Bruneian News](https://www.thebruneian.news/)
-2. Posts a comment reply with the news title, date and content.
+## Configuration
 
-## Running the bot
+Copy `.env.example` to `.env` and provide the Reddit OAuth client ID, client secret, and refresh token. The program optionally reads `.env` from its working directory; process environment variables override file values. Do not commit `.env` or real credentials.
 
-### Prerequisites
+| Variable | Default | Description |
+| --- | --- | --- |
+| `REDDIT_CLIENT_ID` | — | Reddit OAuth application client ID |
+| `REDDIT_CLIENT_SECRET` | — | Reddit OAuth application client secret |
+| `REDDIT_REFRESH_TOKEN` | — | Refresh token for the bot account |
+| `SUBREDDITS` | `testingground4bots` | Comma-separated subreddit names |
+| `BOT_MODE` | `test` | Informational label: `test` or `production` |
+| `DRY_RUN` | `false` | Whether to preview work without posting or persisting state |
+| `RETRY_BASE_DELAY` | `1m` | Base retry delay, in Go duration syntax |
+| `RETRY_WINDOW` | `8h` | Maximum retry window, in Go duration syntax |
+| `CF_CLEARANCE_SCRAPER_URL` | `http://cf-clearance-scraper:3000/cf-clearance-scraper` | Sidecar source endpoint |
+| `DB_PATH` | `./data/bot.db` | SQLite database file path |
 
-1. [.NET 8.0 SDK](https://dotnet.microsoft.com/download)
-2. Windows/Linux/Mac
-3. Docker container running `cf-clearance-scraper`
+`BOT_MODE` does not suppress replies. The configured subreddit list determines the target; use `testingground4bots` while validating the bot.
 
-```
-docker run -d -p 3000:3000 \
--e PORT=3000 \
--e browserLimit=20 \
--e timeOut=60000 \
-zfcsoftware/cf-clearance-scraper:latest
-```
+## Run
 
-### Developing locally
-
-1. Create `appsettings.json` in project folder with the following structure.
-
-```
-{
-    "Reddit": {
-        "Secret": "",
-        "AppId": "",
-        "RefreshToken": ""
-    },
-    "Imgur": {
-        "ClientId": ""
-    },
-    "Proxy": {
-        "Host": "",
-        "Port": 80,
-        "Username": "",
-        "Password": ""
-    },
-    "Subreddits": "testingground4bots"
-}
+```sh
+go run .
 ```
 
-2. Run `dotnet run`.
+The scaffold validates settings and emits structured JSON logs to stdout without logging credentials. It exits after initialization until the bot's worker loop is wired in. Invalid settings produce a structured error log and a non-zero exit status.
 
-### Creating release build
+## Development
 
-1. Open a terminal in the `RedditBruneiNewsBot` directory in this repository.
-2. Run `dotnet build -c Release -o app`.
-3. This will create a build in the `app` folder.
-4. Build configuration can be customised. E.g. To create a single `.exe` file that runs on Windows, etc.
-   Please refer to the [Microsoft Docs](https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-build) for further information.
-
-### Running on the server
-
-1. Copy the `app` folder from the previous section to somewhere safe on the server.
-2. Change working directory into the `app` folder.
-3. Update `appsettings.json` or set it through environment variables. E.g.
-
+```sh
+go test ./...
 ```
-Reddit__Secret=123
-Reddit__AppId=123
-Reddit__RefreshToken=123
-Imgur__ClientId=123
-Subreddits=123,456
-```
-
-4. Run `dotnet RedditBruneiNewsBot.dll`.

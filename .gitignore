@@ -442,3 +442,7 @@ $RECYCLE.BIN/
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+
+# Go bot runtime configuration and data
+.env
+/data/
