@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
+	"strings"
 	"time"
 )
 
@@ -192,7 +194,25 @@ func (r *Runner) scanSubreddit(ctx context.Context, subreddit string, cutoff tim
 }
 
 func eligible(post Submission) bool {
-	return !post.IsSelf && !post.Removed && !post.Deleted && !post.Locked && !post.Archived
+	return !post.IsSelf && !post.Removed && !post.Deleted && !post.Locked && !post.Archived &&
+		isExternalArticleURL(post.URL)
+}
+
+// isExternalArticleURL reports whether rawURL is an http(s) link outside
+// Reddit's own domains. Galleries, videos, images and crossposts all point at
+// Reddit-hosted URLs and have no article to extract.
+func isExternalArticleURL(rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		return false
+	}
+	host := strings.ToLower(u.Hostname())
+	for _, domain := range []string{"reddit.com", "redd.it", "redditmedia.com", "redditstatic.com"} {
+		if host == domain || strings.HasSuffix(host, "."+domain) {
+			return false
+		}
+	}
+	return host != ""
 }
 
 func (r *Runner) beat() {

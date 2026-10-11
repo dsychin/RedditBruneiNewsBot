@@ -255,3 +255,25 @@ func (p *fakePreviewer) Preview(_ context.Context, submission Submission) (strin
 	}
 	return "reply for " + submission.ID, nil
 }
+
+func TestEligibleRequiresExternalArticleURL(t *testing.T) {
+	now := time.Now()
+	tests := map[string]bool{
+		"https://www.thescoop.co/2026/10/a-story":       true,
+		"http://example.com/x":                          true,
+		"https://v.redd.it/a0z6btxhdnuh1":               false,
+		"https://www.reddit.com/gallery/1tstne4":        false,
+		"https://old.reddit.com/r/brunei/comments/x/y/": false,
+		"https://i.redd.it/photo.jpg":                   false,
+		"https://redd.it/abc":                           false,
+		"https://notreddit.com/story":                   true,
+		"ftp://example.com/x":                           false,
+		"not a url":                                     false,
+		"":                                              false,
+	}
+	for link, want := range tests {
+		post := testPost("id", now)
+		post.URL = link
+		assert.Equal(t, want, eligible(post), link)
+	}
+}
