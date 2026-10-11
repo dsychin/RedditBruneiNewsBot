@@ -66,6 +66,8 @@ systemctl --user daemon-reload
 systemctl --user start redditbruneinewsbot.service
 ```
 
+On a server, `curl -fsSL https://raw.githubusercontent.com/dsychin/RedditBruneiNewsBot/main/deploy/install-quadlet.sh | bash` does the same steps: it downloads the units, prompts for the credentials (an existing env file is kept), and starts the services plus the auto-update timer.
+
 The Quadlet bot unit pulls `ghcr.io/dsychin/redditbruneinewsbot:latest`, which the `Publish image` GitHub Actions workflow builds and pushes on every push to `main` (plus `sha-*` and, for `v*` tags, version tags). It pulls a newer image on each start, and `AutoUpdate=registry` lets `systemctl --user enable --now podman-auto-update.timer` roll updates automatically. The GHCR package must be public (GitHub package settings) for an unauthenticated pull; otherwise run `podman login ghcr.io` first. For services to survive logout run `loginctl enable-linger $USER`. Switching to production is a change to `SUBREDDITS` in the env file followed by a restart.
 
 ## Development
