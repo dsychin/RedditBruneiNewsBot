@@ -1,0 +1,25 @@
+[Unit]
+Description=Reddit Brunei News Bot
+Requires=cf-clearance-scraper.service
+After=cf-clearance-scraper.service
+
+[Container]
+ContainerName=redditbruneinewsbot
+Image=redditbruneinewsbot.build
+Network=redditbruneinewsbot.network
+Volume=redditbruneinewsbot-data.volume:/data
+# Reddit credentials and settings; see README for the file location.
+EnvironmentFile=%h/.config/redditbruneinewsbot/bot.env
+Environment=DB_PATH=/data/bot.db
+Environment=CF_CLEARANCE_SCRAPER_URL=http://cf-clearance-scraper:3000/cf-clearance-scraper
+HealthCmd=/bot healthcheck
+HealthInterval=60s
+HealthTimeout=5s
+HealthStartPeriod=30s
+HealthRetries=3
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

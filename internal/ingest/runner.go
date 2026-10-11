@@ -33,6 +33,9 @@ type Runner struct {
 	Subreddits []string
 	Logger     *slog.Logger
 	Now        func() time.Time
+	// Heartbeat, if set, is called after every handled submission and every
+	// finished cycle to signal liveness.
+	Heartbeat func()
 
 	retryAfter map[string]time.Time
 }
@@ -62,6 +65,7 @@ func (r *Runner) Run(ctx context.Context) error {
 		if err := r.RunCycle(ctx); err != nil && !errors.Is(err, context.Canceled) {
 			r.Logger.Error("ingestion cycle failed", slog.Any("error", err))
 		}
+		r.beat()
 		if err := waitForNextTick(ctx, ticker.C, r.now()); err != nil {
 			return err
 		}
@@ -176,6 +180,7 @@ func (r *Runner) scanSubreddit(ctx context.Context, subreddit string, cutoff tim
 			if err := r.Handler.Handle(ctx, post); err != nil {
 				return err
 			}
+			r.beat()
 		}
 
 		if reachedCutoff || listing.After == "" {
@@ -188,6 +193,12 @@ func (r *Runner) scanSubreddit(ctx context.Context, subreddit string, cutoff tim
 
 func eligible(post Submission) bool {
 	return !post.IsSelf && !post.Removed && !post.Deleted && !post.Locked && !post.Archived
+}
+
+func (r *Runner) beat() {
+	if r.Heartbeat != nil {
+		r.Heartbeat()
+	}
 }
 
 func (r *Runner) now() time.Time {

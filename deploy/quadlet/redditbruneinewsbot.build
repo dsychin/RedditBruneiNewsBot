@@ -1,0 +1,4 @@
+[Build]
+ImageTag=localhost/redditbruneinewsbot:local
+SetWorkingDirectory=https://github.com/dsychin/RedditBruneiNewsBot.git#main
+File=Dockerfile

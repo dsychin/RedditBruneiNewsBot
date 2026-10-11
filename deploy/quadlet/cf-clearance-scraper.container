@@ -1,0 +1,24 @@
+[Unit]
+Description=cf-clearance-scraper sidecar for the Reddit Brunei News Bot
+
+[Container]
+ContainerName=cf-clearance-scraper
+Image=docker.io/zfcsoftware/cf-clearance-scraper:2.1.3@sha256:0a058a0fd6d323cbbe1583cab179a03a6856a6f7cc9a49aa8b8d0e8851656b6c
+Network=redditbruneinewsbot.network
+# No PublishPort: only reachable by the bot over the private network.
+Environment=PORT=3000
+Environment=browserLimit=2
+Environment=timeOut=60000
+HealthCmd=curl -s -o /dev/null http://127.0.0.1:3000/
+HealthInterval=30s
+HealthTimeout=5s
+HealthStartPeriod=20s
+HealthRetries=3
+# Report ready to systemd only once the healthcheck passes, so the bot waits for it.
+Notify=healthy
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
