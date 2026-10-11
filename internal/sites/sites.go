@@ -20,4 +20,4 @@ var TitleSuffixes = []string{
 }
 
 // TitleSeparators may precede a site-name suffix.
-var TitleSeparators = []string{" | ", " - ", " – ", " — ", " :: "}
+var TitleSeparators = []string{" | ", " - ", " – ", " — ", " :: ", " » "}

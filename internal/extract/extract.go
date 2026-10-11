@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	readability "codeberg.org/readeck/go-readability/v2"
+	"golang.org/x/net/html"
 
 	"github.com/dsychin/RedditBruneiNewsBot/internal/sites"
 )
@@ -49,6 +50,7 @@ func Reply(page io.Reader, pageURL *url.URL, version string) (string, error) {
 
 	var text bytes.Buffer
 	if article.Node != nil {
+		removeCaptions(article.Node)
 		if err := article.RenderText(&text); err != nil {
 			return "", fmt.Errorf("render article text: %w", err)
 		}
@@ -75,6 +77,26 @@ func Reply(page io.Reader, pageURL *url.URL, version string) (string, error) {
 		reply += marker
 	}
 	return reply + footer, nil
+}
+
+// removeCaptions drops image captions, which the text renderer would otherwise
+// run onto the end of the preceding paragraph.
+func removeCaptions(root *html.Node) {
+	var captions []*html.Node
+	var walk func(*html.Node)
+	walk = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "figcaption" {
+			captions = append(captions, n)
+			return
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			walk(c)
+		}
+	}
+	walk(root)
+	for _, c := range captions {
+		c.Parent.RemoveChild(c)
+	}
 }
 
 // CleanTitle trims whitespace and strips a trailing known site-name suffix.

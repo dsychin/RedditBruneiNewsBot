@@ -93,6 +93,7 @@ func TestCleanTitle(t *testing.T) {
 		"Story - Borneo Post Online":        "Story",
 		"Story – The Borneo Post":           "Story",
 		"  Story \n  | Borneo Bulletin  ":   "Story",
+		"Story » Borneo Bulletin Online":    "Story",
 		"Story - Some Other Site":           "Story - Some Other Site",
 		"Borneo Post Online":                "Borneo Post Online",
 		"Why Borneo Post Online is popular": "Why Borneo Post Online is popular",
@@ -142,4 +143,20 @@ func TestTruncate(t *testing.T) {
 		assert.Equal(t, "éééé", got)
 		assert.True(t, utf8.ValidString(got))
 	})
+}
+
+func TestReplyOmitsImageCaptions(t *testing.T) {
+	paragraph := strings.Repeat("The department will continue monitoring air quality nationwide. ", 5)
+	page := "<html><head><title>Haze update</title></head><body><article><h1>Haze update</h1>" +
+		"<p>" + paragraph + "</p>" +
+		"<figure><img src=\"a.jpg\"><figcaption>FILE – The haze in September. PHOTO: SOMEONE</figcaption></figure>" +
+		"</article></body></html>"
+	u, err := url.Parse("https://example.com/haze")
+	require.NoError(t, err)
+
+	reply, err := Reply(strings.NewReader(page), u, "v2.00")
+	require.NoError(t, err)
+	assert.Contains(t, reply, "air quality nationwide")
+	assert.NotContains(t, reply, "PHOTO")
+	assert.NotContains(t, reply, "FILE –")
 }
