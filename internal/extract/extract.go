@@ -13,6 +13,8 @@ import (
 	"unicode/utf8"
 
 	readability "codeberg.org/readeck/go-readability/v2"
+
+	"github.com/dsychin/RedditBruneiNewsBot/internal/sites"
 )
 
 const (
@@ -78,8 +80,8 @@ func Reply(page io.Reader, pageURL *url.URL, version string) (string, error) {
 // CleanTitle trims whitespace and strips a trailing known site-name suffix.
 func CleanTitle(title string) string {
 	title = strings.Join(strings.Fields(title), " ")
-	for _, site := range titleSuffixes {
-		for _, sep := range titleSeparators {
+	for _, site := range sites.TitleSuffixes {
+		for _, sep := range sites.TitleSeparators {
 			if cut, ok := strings.CutSuffix(title, sep+site); ok {
 				return strings.TrimSpace(cut)
 			}
