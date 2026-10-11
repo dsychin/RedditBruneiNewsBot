@@ -4,8 +4,10 @@ go 1.27.2
 
 require (
 	codeberg.org/readeck/go-readability/v2 v2.1.3
+	github.com/gofrs/flock v0.13.1
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.12.1
+	modernc.org/sqlite v1.60.1
 )
 
 require (
@@ -14,7 +16,6 @@ require (
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-shiori/dom v0.0.0-20230515143342-73569d674e1c // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
-	github.com/gofrs/flock v0.13.1 // indirect
 	github.com/gogs/chardet v0.0.0-20211120154057-b7413eaefb8f // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/itlightning/dateparse v0.2.1 // indirect
@@ -35,5 +36,4 @@ require (
 	modernc.org/libc v1.77.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
-	modernc.org/sqlite v1.60.1 // indirect
 )

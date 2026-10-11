@@ -5,7 +5,7 @@
 ![GitHub issues](https://img.shields.io/github/issues-raw/dsychin/RedditBruneiNewsBot)
 ![GitHub last commit](https://img.shields.io/github/last-commit/dsychin/RedditBruneiNewsBot)
 
-The Reddit bot monitors configured subreddits for news links, extracts article text, and replies with a formatted summary. The Go rewrite is in progress; this scaffold currently validates configuration, logs safe operational settings, and exits. Reddit intake, persistence, fetching, extraction, and deployment are implemented in subsequent steps.
+The Reddit bot monitors configured subreddits for news links, extracts article text, and replies with a formatted summary. The Go rewrite is in progress; the scaffold validates configuration, initializes its SQLite state store, acquires a single-instance lock, logs safe operational settings, and exits. Reddit intake, fetching, reply posting, and deployment are implemented in subsequent steps.
 
 ## Requirements
 
@@ -36,7 +36,7 @@ The configured subreddit list determines where the bot posts; use `testingground
 go run .
 ```
 
-The scaffold validates settings and emits structured JSON logs to stdout without logging credentials. It exits after initialization until the bot's worker loop is wired in. Invalid settings produce a structured error log and a non-zero exit status.
+The scaffold validates settings, initializes the SQLite database, and emits structured JSON logs to stdout without logging credentials. It exits after initialization until the bot's worker loop is wired in. A second instance using the same database is refused. Invalid settings or database initialization failures produce a structured error log and a non-zero exit status.
 
 ## Development
 
