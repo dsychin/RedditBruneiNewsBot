@@ -3,37 +3,25 @@ package config
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLoadUsesSafeDefaultsAndParsesSubreddits(t *testing.T) {
 	cfg, err := load(validValues(map[string]string{
 		"SUBREDDITS": " testingground4bots, brunei_news ",
 	}))
-	if err != nil {
-		t.Fatalf("load returned an error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if cfg.RetryBaseDelay != time.Minute {
-		t.Errorf("RetryBaseDelay = %s, want 1m", cfg.RetryBaseDelay)
-	}
-	if cfg.RetryWindow != 8*time.Hour {
-		t.Errorf("RetryWindow = %s, want 8h", cfg.RetryWindow)
-	}
-	if cfg.DryRun {
-		t.Error("DryRun = true, want false")
-	}
-	if cfg.SidecarURL != defaultSidecarURL {
-		t.Errorf("SidecarURL = %q, want %q", cfg.SidecarURL, defaultSidecarURL)
-	}
-	if cfg.DBPath != defaultDBPath {
-		t.Errorf("DBPath = %q, want %q", cfg.DBPath, defaultDBPath)
-	}
-	if len(cfg.Subreddits) != 2 || cfg.Subreddits[0] != "testingground4bots" || cfg.Subreddits[1] != "brunei_news" {
-		t.Errorf("Subreddits = %#v, want [testingground4bots brunei_news]", cfg.Subreddits)
-	}
+	assert.Equal(t, time.Minute, cfg.RetryBaseDelay)
+	assert.Equal(t, 8*time.Hour, cfg.RetryWindow)
+	assert.False(t, cfg.DryRun)
+	assert.Equal(t, defaultSidecarURL, cfg.SidecarURL)
+	assert.Equal(t, defaultDBPath, cfg.DBPath)
+	assert.Equal(t, []string{"testingground4bots", "brunei_news"}, cfg.Subreddits)
 }
 
 func TestReadValuesUsesDefaultsWhenOptionalFileIsMissing(t *testing.T) {
@@ -43,41 +31,26 @@ func TestReadValuesUsesDefaultsWhenOptionalFileIsMissing(t *testing.T) {
 	t.Setenv("REDDIT_REFRESH_TOKEN", "test-token")
 
 	values, err := readValues(filepath.Join(t.TempDir(), "missing.env"))
-	if err != nil {
-		t.Fatalf("readValues returned an error: %v", err)
-	}
+	require.NoError(t, err)
 	cfg, err := load(values.GetString)
-	if err != nil {
-		t.Fatalf("load returned an error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if cfg.DryRun || cfg.RetryBaseDelay != defaultRetryBaseDelay || cfg.RetryWindow != defaultRetryWindow {
-		t.Errorf("unexpected defaults: dry_run=%t retry_base_delay=%s retry_window=%s", cfg.DryRun, cfg.RetryBaseDelay, cfg.RetryWindow)
-	}
-	if len(cfg.Subreddits) != 1 || cfg.Subreddits[0] != defaultSubreddits {
-		t.Errorf("Subreddits = %#v, want [%s]", cfg.Subreddits, defaultSubreddits)
-	}
-	if cfg.SidecarURL != defaultSidecarURL || cfg.DBPath != defaultDBPath {
-		t.Errorf("unexpected endpoint or DB defaults: sidecar=%q db=%q", cfg.SidecarURL, cfg.DBPath)
-	}
+	assert.False(t, cfg.DryRun)
+	assert.Equal(t, defaultRetryBaseDelay, cfg.RetryBaseDelay)
+	assert.Equal(t, defaultRetryWindow, cfg.RetryWindow)
+	assert.Equal(t, []string{defaultSubreddits}, cfg.Subreddits)
+	assert.Equal(t, defaultSidecarURL, cfg.SidecarURL)
+	assert.Equal(t, defaultDBPath, cfg.DBPath)
 }
 
 func TestLoadValidatesRequiredValuesAndFormats(t *testing.T) {
 	_, err := load(func(string) string { return "" })
-	if err == nil {
-		t.Fatal("load succeeded with missing required configuration")
-	}
+	require.Error(t, err)
 
-	for _, want := range []string{
-		"REDDIT_CLIENT_ID is required",
-		"REDDIT_CLIENT_SECRET is required",
-		"REDDIT_REFRESH_TOKEN is required",
-		"SUBREDDITS must contain at least one subreddit",
-	} {
-		if !strings.Contains(err.Error(), want) {
-			t.Errorf("error %q does not contain %q", err, want)
-		}
-	}
+	assert.ErrorContains(t, err, "REDDIT_CLIENT_ID is required")
+	assert.ErrorContains(t, err, "REDDIT_CLIENT_SECRET is required")
+	assert.ErrorContains(t, err, "REDDIT_REFRESH_TOKEN is required")
+	assert.ErrorContains(t, err, "SUBREDDITS must contain at least one subreddit")
 }
 
 func TestLoadRejectsInvalidSettings(t *testing.T) {
@@ -88,21 +61,13 @@ func TestLoadRejectsInvalidSettings(t *testing.T) {
 		"CF_CLEARANCE_SCRAPER_URL": "file:///tmp/scraper",
 		"SUBREDDITS":               "brunei_news, Brunei_News",
 	}))
-	if err == nil {
-		t.Fatal("load succeeded with invalid configuration")
-	}
+	require.Error(t, err)
 
-	for _, want := range []string{
-		"DRY_RUN must be a boolean",
-		"RETRY_BASE_DELAY must be a positive duration",
-		"RETRY_WINDOW must be greater than or equal to RETRY_BASE_DELAY",
-		"CF_CLEARANCE_SCRAPER_URL must be an absolute HTTP or HTTPS URL",
-		"listed more than once",
-	} {
-		if !strings.Contains(err.Error(), want) {
-			t.Errorf("error %q does not contain %q", err, want)
-		}
-	}
+	assert.ErrorContains(t, err, "DRY_RUN must be a boolean")
+	assert.ErrorContains(t, err, "RETRY_BASE_DELAY must be a positive duration")
+	assert.ErrorContains(t, err, "RETRY_WINDOW must be greater than or equal to RETRY_BASE_DELAY")
+	assert.ErrorContains(t, err, "CF_CLEARANCE_SCRAPER_URL must be an absolute HTTP or HTTPS URL")
+	assert.ErrorContains(t, err, "listed more than once")
 }
 
 func TestLoadAcceptsConfiguredValues(t *testing.T) {
@@ -114,62 +79,41 @@ func TestLoadAcceptsConfiguredValues(t *testing.T) {
 		"DB_PATH":                  "/var/lib/reddit-bot/state.db",
 		"SUBREDDITS":               "testingground4bots",
 	}))
-	if err != nil {
-		t.Fatalf("load returned an error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if cfg.RetryBaseDelay != 2*time.Minute || cfg.RetryWindow != 12*time.Hour {
-		t.Errorf("unexpected config values: retry_base_delay=%s retry_window=%s", cfg.RetryBaseDelay, cfg.RetryWindow)
-	}
-	if !cfg.DryRun {
-		t.Error("DryRun = false, want true")
-	}
-	if cfg.SidecarURL != "http://localhost:3000/cf-clearance-scraper" || cfg.DBPath != "/var/lib/reddit-bot/state.db" {
-		t.Errorf("unexpected endpoint or DB path: sidecar=%q db=%q", cfg.SidecarURL, cfg.DBPath)
-	}
+	assert.Equal(t, 2*time.Minute, cfg.RetryBaseDelay)
+	assert.Equal(t, 12*time.Hour, cfg.RetryWindow)
+	assert.True(t, cfg.DryRun)
+	assert.Equal(t, "http://localhost:3000/cf-clearance-scraper", cfg.SidecarURL)
+	assert.Equal(t, "/var/lib/reddit-bot/state.db", cfg.DBPath)
 }
 
 func TestLoadReadsOptionalEnvFileAndProcessEnvironmentOverridesIt(t *testing.T) {
 	clearConfigEnvironment(t)
 	path := filepath.Join(t.TempDir(), ".env")
-	if err := os.WriteFile(path, []byte("REDDIT_CLIENT_ID=file-id\nREDDIT_CLIENT_SECRET=file-secret\nREDDIT_REFRESH_TOKEN=file-token\nSUBREDDITS=file_subreddit\n"), 0o600); err != nil {
-		t.Fatalf("write .env: %v", err)
-	}
+	require.NoError(t, os.WriteFile(path, []byte("REDDIT_CLIENT_ID=file-id\nREDDIT_CLIENT_SECRET=file-secret\nREDDIT_REFRESH_TOKEN=file-token\nSUBREDDITS=file_subreddit\n"), 0o600))
 	t.Setenv("REDDIT_CLIENT_ID", "environment-id")
 	t.Setenv("SUBREDDITS", "testingground4bots")
 
 	values, err := readValues(path)
-	if err != nil {
-		t.Fatalf("readValues returned an error: %v", err)
-	}
+	require.NoError(t, err)
 	cfg, err := load(values.GetString)
-	if err != nil {
-		t.Fatalf("load returned an error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if cfg.RedditClientID != "environment-id" {
-		t.Errorf("RedditClientID = %q, want environment value", cfg.RedditClientID)
-	}
-	if cfg.RedditClientSecret != "file-secret" || cfg.RedditRefreshToken != "file-token" {
-		t.Errorf("file credentials were not loaded: secret=%q refresh token=%q", cfg.RedditClientSecret, cfg.RedditRefreshToken)
-	}
-	if len(cfg.Subreddits) != 1 || cfg.Subreddits[0] != "testingground4bots" {
-		t.Errorf("Subreddits = %#v, want environment override", cfg.Subreddits)
-	}
+	assert.Equal(t, "environment-id", cfg.RedditClientID)
+	assert.Equal(t, "file-secret", cfg.RedditClientSecret)
+	assert.Equal(t, "file-token", cfg.RedditRefreshToken)
+	assert.Equal(t, []string{"testingground4bots"}, cfg.Subreddits)
 }
 
 func TestReadValuesAllowsMissingFileAndRejectsMalformedFile(t *testing.T) {
-	if _, err := readValues(filepath.Join(t.TempDir(), "missing.env")); err != nil {
-		t.Fatalf("readValues rejected a missing optional file: %v", err)
-	}
+	_, err := readValues(filepath.Join(t.TempDir(), "missing.env"))
+	require.NoError(t, err)
 
 	path := filepath.Join(t.TempDir(), ".env")
-	if err := os.WriteFile(path, []byte("=malformed\n"), 0o600); err != nil {
-		t.Fatalf("write malformed .env: %v", err)
-	}
-	if _, err := readValues(path); err == nil {
-		t.Fatal("readValues accepted a malformed .env file")
-	}
+	require.NoError(t, os.WriteFile(path, []byte("=malformed\n"), 0o600))
+	_, err = readValues(path)
+	assert.Error(t, err)
 }
 
 func clearConfigEnvironment(t *testing.T) {
@@ -187,9 +131,7 @@ func clearConfigEnvironment(t *testing.T) {
 	}
 	for _, key := range keys {
 		value, exists := os.LookupEnv(key)
-		if err := os.Unsetenv(key); err != nil {
-			t.Fatalf("unset %s: %v", key, err)
-		}
+		require.NoError(t, os.Unsetenv(key))
 		t.Cleanup(func() {
 			if exists {
 				_ = os.Setenv(key, value)
