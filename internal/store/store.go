@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"time"
@@ -90,6 +91,88 @@ func Open(path string) (*Store, error) {
 		return nil, errors.Join(err, db.Close(), lock.Close())
 	}
 	return s, nil
+}
+
+// ReadOnly opens an existing database without creating files, acquiring the
+// process lock, initializing schema, or recovering abandoned claims.
+type ReadOnly struct {
+	db *sql.DB
+}
+
+// OpenReadOnly opens the database for read-only state checks. A missing
+// database is treated as an empty store.
+func OpenReadOnly(path string) (*ReadOnly, error) {
+	if path == "" {
+		return nil, errors.New("database path must not be empty")
+	}
+	absolutePath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, fmt.Errorf("resolve database path: %w", err)
+	}
+	if _, err := os.Stat(absolutePath); err != nil {
+		if os.IsNotExist(err) {
+			return &ReadOnly{}, nil
+		}
+		return nil, fmt.Errorf("inspect database file %q: %w", absolutePath, err)
+	}
+
+	databaseURL := url.URL{Scheme: "file", Path: absolutePath}
+	query := databaseURL.Query()
+	query.Set("mode", "ro")
+	databaseURL.RawQuery = query.Encode()
+	db, err := sql.Open("sqlite", databaseURL.String())
+	if err != nil {
+		return nil, fmt.Errorf("open SQLite database read-only: %w", err)
+	}
+	db.SetMaxOpenConns(1)
+	if err := db.PingContext(context.Background()); err != nil {
+		return nil, errors.Join(fmt.Errorf("connect to SQLite database read-only: %w", err), db.Close())
+	}
+
+	rows, err := db.QueryContext(context.Background(), "SELECT post_id, status FROM posts LIMIT 0")
+	if err != nil {
+		return nil, errors.Join(fmt.Errorf("validate SQLite post state read-only: %w", err), db.Close())
+	}
+	if err := rows.Close(); err != nil {
+		return nil, errors.Join(fmt.Errorf("close SQLite validation query: %w", err), db.Close())
+	}
+	return &ReadOnly{db: db}, nil
+}
+
+// Close closes the read-only database connection.
+func (s *ReadOnly) Close() error {
+	if s.db == nil {
+		return nil
+	}
+	return s.db.Close()
+}
+
+// IsHandled reports whether a post has reached a terminal replied or skipped
+// state. Pending work remains eligible for a dry-run preview.
+func (s *ReadOnly) IsHandled(ctx context.Context, postID string) (bool, error) {
+	if postID == "" {
+		return false, errors.New("post ID must not be empty")
+	}
+	if s.db == nil {
+		return false, nil
+	}
+
+	var status Status
+	err := s.db.QueryRowContext(ctx, "SELECT status FROM posts WHERE post_id = ?", postID).Scan(&status)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("read post state: %w", err)
+	}
+	switch status {
+	case StatusReplied, StatusSkipped:
+		return true, nil
+	case StatusPending:
+		return false, nil
+	default:
+		return false, fmt.Errorf("read post state: unknown status %q", status)
+	}
 }
 
 // Close closes the database and releases the process lock.

@@ -1,10 +1,16 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/dsychin/RedditBruneiNewsBot/internal/config"
+	"github.com/dsychin/RedditBruneiNewsBot/internal/fetch"
+	"github.com/dsychin/RedditBruneiNewsBot/internal/ingest"
 	"github.com/dsychin/RedditBruneiNewsBot/internal/store"
 )
 
@@ -17,23 +23,41 @@ func main() {
 		os.Exit(1)
 	}
 
-	state, err := store.Open(cfg.DBPath)
+	if !cfg.DryRun {
+		logger.Error(
+			"normal processing is unavailable until reply posting is implemented",
+			slog.String("hint", "set DRY_RUN=true to preview submissions"),
+		)
+		os.Exit(1)
+	}
+
+	state, err := store.OpenReadOnly(cfg.DBPath)
 	if err != nil {
-		logger.Error("initialize state store", slog.String("error", err.Error()))
+		logger.Error("open state store read-only", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
 	defer func() {
 		if err := state.Close(); err != nil {
-			logger.Error("close state store", slog.String("error", err.Error()))
+			logger.Error("close read-only state store", slog.String("error", err.Error()))
 		}
 	}()
 
+	reddit := ingest.NewRedditClient(cfg.RedditClientID, cfg.RedditClientSecret, cfg.RedditRefreshToken)
+	articleFetcher := &fetch.Fetcher{SidecarURL: cfg.SidecarURL}
+	previewer := &ingest.ArticlePreviewer{Fetcher: articleFetcher, Version: "v2.00"}
+	runner := ingest.NewRunner(reddit, state, previewer, cfg.Subreddits, logger)
+
 	logger.Info(
-		"bot scaffold initialized",
+		"submission ingestion started",
 		slog.Any("subreddits", cfg.Subreddits),
-		slog.Bool("dry_run", cfg.DryRun),
-		slog.String("retry_base_delay", cfg.RetryBaseDelay.String()),
-		slog.String("retry_window", cfg.RetryWindow.String()),
+		slog.Duration("poll_interval", ingest.PollInterval),
 		slog.String("db_path", cfg.DBPath),
 	)
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err := runner.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+		logger.Error("submission ingestion stopped", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
 }

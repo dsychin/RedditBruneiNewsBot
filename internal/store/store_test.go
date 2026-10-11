@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -216,6 +217,64 @@ func TestGetMissingPost(t *testing.T) {
 	_, err := s.Get(context.Background(), "missing")
 	require.ErrorIs(t, err, ErrNotFound)
 	assert.False(t, errors.Is(err, ErrNotClaimed))
+}
+
+func TestOpenReadOnlyTreatsMissingDatabaseAsEmptyWithoutCreatingIt(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "missing.db")
+
+	s, err := OpenReadOnly(path)
+	require.NoError(t, err)
+	require.NoError(t, s.Close())
+
+	_, err = os.Stat(path)
+	require.ErrorIs(t, err, os.ErrNotExist)
+}
+
+func TestReadOnlyRecognizesOnlyTerminalStatesAsHandled(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "bot.db")
+	writable := openTestStore(t, path)
+	now := time.Now().UTC()
+	for _, postID := range []string{"pending", "replied", "skipped"} {
+		claimed, err := writable.Claim(ctx, postID, "news", now)
+		require.NoError(t, err)
+		require.True(t, claimed)
+	}
+	require.NoError(t, writable.MarkReplied(ctx, "replied", now))
+	require.NoError(t, writable.MarkSkipped(ctx, "skipped", now))
+
+	readOnly, err := OpenReadOnly(path)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = readOnly.Close() })
+
+	for postID, want := range map[string]bool{
+		"missing": false,
+		"pending": false,
+		"replied": true,
+		"skipped": true,
+	} {
+		handled, err := readOnly.IsHandled(ctx, postID)
+		require.NoError(t, err)
+		assert.Equal(t, want, handled, postID)
+	}
+	pending, err := writable.Get(ctx, "pending")
+	require.NoError(t, err)
+	require.NotNil(t, pending.ClaimedAt)
+}
+
+func TestOpenReadOnlyRejectsInvalidDatabaseWithoutModifyingIt(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "invalid.db")
+	require.NoError(t, os.WriteFile(path, []byte("not sqlite"), 0o600))
+	before, err := os.ReadFile(path)
+	require.NoError(t, err)
+
+	readOnly, err := OpenReadOnly(path)
+	require.Error(t, err)
+	assert.Nil(t, readOnly)
+
+	after, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, before, after)
 }
 
 func openTestStore(t *testing.T, path string) *Store {
