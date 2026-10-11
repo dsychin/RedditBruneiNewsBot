@@ -60,6 +60,7 @@ docker compose up -d --build
 ```sh
 mkdir -p ~/.config/redditbruneinewsbot ~/.config/containers/systemd
 cp .env.example ~/.config/redditbruneinewsbot/bot.env   # then fill in the Reddit credentials
+chmod 600 ~/.config/redditbruneinewsbot/bot.env
 cp deploy/quadlet/* ~/.config/containers/systemd/
 systemctl --user daemon-reload
 systemctl --user start redditbruneinewsbot.service
