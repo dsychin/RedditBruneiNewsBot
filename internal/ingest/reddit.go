@@ -344,6 +344,14 @@ func (c *RedditClient) refresh(ctx context.Context) (string, time.Duration, erro
 		return "", 0, fmt.Errorf("close Reddit OAuth response: %w", closeErr)
 	}
 	if resp.StatusCode != http.StatusOK {
+		// Reddit's OAuth error code (e.g. invalid_grant) is safe to log and
+		// distinguishes a bad refresh token from other failures.
+		var oauthErr struct {
+			Error string `json:"error"`
+		}
+		if json.Unmarshal(body, &oauthErr) == nil && oauthErr.Error != "" {
+			return "", 0, fmt.Errorf("Reddit OAuth returned HTTP %s (%s)", resp.Status, oauthErr.Error)
+		}
 		return "", 0, fmt.Errorf("Reddit OAuth returned HTTP %s", resp.Status)
 	}
 

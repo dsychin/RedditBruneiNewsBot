@@ -113,6 +113,18 @@ func TestRedditClientReturnsRateLimitDelay(t *testing.T) {
 	assert.Equal(t, 2*time.Minute, apiErr.RetryAfter)
 }
 
+func TestRedditClientReportsOAuthErrorCode(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = fmt.Fprint(w, `{"error":"invalid_grant"}`)
+	}))
+	defer server.Close()
+
+	_, err := newTestRedditClient(server).NewSubmissions(context.Background(), "news", "", 0)
+	require.ErrorIs(t, err, ErrAuthentication)
+	assert.Contains(t, err.Error(), "invalid_grant")
+}
+
 func TestRedditClientMarksOAuthFailure(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "invalid credentials", http.StatusUnauthorized)
